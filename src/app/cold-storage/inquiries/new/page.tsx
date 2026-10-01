@@ -22,6 +22,7 @@ export default function NewInquiryPage() {
   const [customers, setCustomers] = useState<Customer[]>([])
   const [coldStorages, setColdStorages] = useState<ColdStorage[]>([])
   const [saving, setSaving] = useState(false)
+  const [loadingRefs, setLoadingRefs] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
   const { register, handleSubmit, formState: { errors } } = useForm()
@@ -35,12 +36,14 @@ export default function NewInquiryPage() {
   }, [loaded, canAccess])
 
   async function loadRefs() {
+    setLoadingRefs(true)
     const [cRes, csRes] = await Promise.all([
       supabase.from('rental_customers').select('id, name').eq('organization_id', ORG_ID).order('name'),
       supabase.from('cold_storages').select('id, name').eq('organization_id', ORG_ID).order('name'),
     ])
     setCustomers(cRes.data || [])
     setColdStorages(csRes.data || [])
+    setLoadingRefs(false)
   }
 
   async function onSubmit(form: any) {
@@ -84,7 +87,14 @@ export default function NewInquiryPage() {
             <div className="p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700">{error}</div>
           )}
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          {loadingRefs && (
+            <div className="flex items-center justify-center py-12">
+              <Loader2 className="w-6 h-6 animate-spin text-cyan-600" />
+              <span className="ml-2 text-sm text-slate-500">Memuat data...</span>
+            </div>
+          )}
+
+          <div className={loadingRefs ? "opacity-50 pointer-events-none" : ""}>
             <div>
               <label className="block text-sm font-medium text-slate-700 mb-1">Customer</label>
               <select {...register('customer_id')} className="w-full border border-slate-200 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-cyan-500">

@@ -34,6 +34,7 @@ export default function NewContractPage() {
   const [customers, setCustomers] = useState<Customer[]>([])
   const [coldStorages, setColdStorages] = useState<ColdStorage[]>([])
   const [saving, setSaving] = useState(false)
+  const [loadingRefs, setLoadingRefs] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
   const { register, handleSubmit, watch, setValue, control, formState: { errors } } = useForm<ContractFormData>({
@@ -50,12 +51,14 @@ export default function NewContractPage() {
   }, [loaded, canAccess])
 
   async function loadRefs() {
+    setLoadingRefs(true)
     const [cRes, csRes] = await Promise.all([
       supabase.from('rental_customers').select('id, name').eq('organization_id', ORG_ID).order('name'),
       supabase.from('cold_storages').select('id, name').eq('organization_id', ORG_ID).order('name'),
     ])
     setCustomers(cRes.data || [])
     setColdStorages(csRes.data || [])
+    setLoadingRefs(false)
   }
 
   async function onSubmit(form: any) {
@@ -107,7 +110,14 @@ export default function NewContractPage() {
             <div className="p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700">{error}</div>
           )}
 
-          <div className="bg-white rounded-xl border border-slate-200 p-6 space-y-5">
+          {loadingRefs && (
+            <div className="bg-white rounded-xl border border-slate-200 p-6 flex items-center justify-center py-12">
+              <Loader2 className="w-6 h-6 animate-spin text-cyan-600" />
+              <span className="ml-2 text-sm text-slate-500">Memuat data...</span>
+            </div>
+          )}
+
+          <div className={"bg-white rounded-xl border border-slate-200 p-6 space-y-5" + (loadingRefs ? " opacity-50 pointer-events-none" : "")}>
             <h2 className="text-sm font-semibold text-slate-600 uppercase tracking-wide">Data Kontrak</h2>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">

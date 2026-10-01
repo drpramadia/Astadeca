@@ -26,6 +26,7 @@ export default function NewPOPage() {
   const [supplierId, setSupplierId] = useState('')
   const [notes, setNotes] = useState('')
   const [saving, setSaving] = useState(false)
+  const [loadingRefs, setLoadingRefs] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
   const canAccess = roleName === 'DIRECTOR' || roleName === 'ADMIN'
@@ -37,12 +38,14 @@ export default function NewPOPage() {
   }, [loaded, canAccess])
 
   async function loadRefs() {
+    setLoadingRefs(true)
     const [sRes, pRes] = await Promise.all([
       supabase.from('suppliers').select('id, name').eq('organization_id', ORG_ID).order('name'),
       supabase.from('products').select('id, name, sku, unit_id').eq('organization_id', ORG_ID).eq('is_active', true).order('name'),
     ])
     setSuppliers(sRes.data || [])
     setProducts(pRes.data || [])
+    setLoadingRefs(false)
   }
 
   function updateItem(idx: number, field: keyof LineItem, val: string) {
@@ -114,7 +117,14 @@ export default function NewPOPage() {
         <form onSubmit={handleSubmit} className="space-y-5">
           {error && <div className="p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700">{error}</div>}
 
-          <div className="bg-white rounded-xl border border-slate-200 p-6 space-y-5">
+          {loadingRefs && (
+            <div className="bg-white rounded-xl border border-slate-200 p-6 flex items-center justify-center py-12">
+              <Loader2 className="w-6 h-6 animate-spin text-cyan-600" />
+              <span className="ml-2 text-sm text-slate-500">Memuat data...</span>
+            </div>
+          )}
+
+          <div className={loadingRefs ? "bg-white rounded-xl border border-slate-200 p-6 space-y-5 opacity-50 pointer-events-none" : "bg-white rounded-xl border border-slate-200 p-6 space-y-5"}>
             <div>
               <label className="block text-sm font-medium text-slate-700 mb-1">Supplier *</label>
               <select value={supplierId} onChange={(e) => setSupplierId(e.target.value)} required className="w-full border border-slate-200 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-cyan-500">

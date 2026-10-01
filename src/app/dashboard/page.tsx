@@ -3,6 +3,8 @@
 import AppShell from '@/components/app-shell'
 import LogoutButton from '@/components/logout-button'
 import { useSession } from '@/hooks/use-session'
+import { useEffect } from 'react'
+import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import {
   Snowflake,
@@ -101,7 +103,31 @@ function QuickLink({
 // ─── Dashboard page ──────────────────────────────────────────────────────────
 
 export default function DashboardPage() {
-  const { name, roleName, loaded } = useSession()
+  const { name, roleName, loaded, userId } = useSession()
+  const router = useRouter()
+
+  // Redirect to login if not authenticated
+  useEffect(() => {
+    if (loaded && !userId) {
+      router.replace('/login')
+    }
+  }, [loaded, userId, router])
+
+  // Show loading while checking auth
+  if (!loaded || !userId) {
+    return (
+      <AppShell>
+        <div className="p-6 lg:p-8 max-w-7xl mx-auto flex items-center justify-center min-h-[60vh]">
+          <div className="text-center">
+            <div className="inline-flex items-center justify-center w-10 h-10 rounded-full bg-cyan-100 mb-3">
+              <Snowflake className="w-5 h-5 text-cyan-600 animate-pulse" />
+            </div>
+            <p className="text-sm text-slate-500">Memeriksa sesi...</p>
+          </div>
+        </div>
+      </AppShell>
+    )
+  }
 
   const greeting = (() => {
     const hour = new Date().getHours()
