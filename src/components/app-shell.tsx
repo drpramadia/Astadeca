@@ -1,8 +1,8 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import Link from 'next/link'
-import { usePathname } from 'next/navigation'
+import { usePathname, useRouter } from 'next/navigation'
 import {
   LayoutDashboard,
   Snowflake,
@@ -10,10 +10,7 @@ import {
   PackageSearch,
   Truck,
   ClipboardCheck,
-  Settings,
   Users,
-  Tag,
-  Building2,
   ChevronDown,
   ChevronRight,
   Menu,
@@ -27,6 +24,7 @@ import {
   ChevronLeft,
 } from 'lucide-react'
 import { useSession } from '@/hooks/use-session'
+import LogoutButton from '@/components/logout-button'
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -59,8 +57,6 @@ const NAV_GROUPS: NavGroup[] = [
       { label: 'Rental Inquiry', href: '/cold-storage/inquiries', icon: PackageSearch },
       { label: 'Kontrak', href: '/cold-storage/contracts', icon: FileText },
       { label: 'Rates', href: '/cold-storage/rates', icon: DollarSign },
-      { label: 'Penerimaan', href: '/cold-storage/receivings', icon: ArrowDownToLine },
-      { label: 'Pelepasan', href: '/cold-storage/releases', icon: ArrowUpFromLine },
       { label: 'Billing', href: '/cold-storage/billing', icon: DollarSign },
     ],
   },
@@ -80,6 +76,7 @@ const NAV_GROUPS: NavGroup[] = [
       { label: 'Penerimaan Barang', href: '/warehouse/goods-receipts', icon: ArrowDownToLine },
       { label: 'Pengeluaran Barang', href: '/warehouse/goods-issues', icon: ArrowUpFromLine },
       { label: 'Inventory', href: '/warehouse/inventory', icon: Boxes },
+      { label: 'QC Inspection', href: '/warehouse/qc', icon: ClipboardCheck },
     ],
   },
   {
@@ -93,16 +90,7 @@ const NAV_GROUPS: NavGroup[] = [
     label: 'Data Master',
     icon: Users,
     items: [
-      { label: 'Products', href: '/master/products', icon: Tag },
-      { label: 'Customers', href: '/master/customers', icon: Building2 },
-      { label: 'Suppliers', href: '/master/suppliers', icon: Truck },
-    ],
-  },
-  {
-    label: 'Settings',
-    icon: Settings,
-    items: [
-      { label: 'Pengaturan', href: '/settings', icon: Settings },
+      { label: 'Data Master', href: '/master-data', icon: Users },
     ],
   },
 ]
@@ -190,24 +178,19 @@ function NavGroupRow({
 // ─── App Shell ───────────────────────────────────────────────────────────────
 
 export default function AppShell({ children }: { children: React.ReactNode }) {
-  const { name, roleName, loaded } = useSession()
+  const { name, roleName, roleCode, loaded, userId } = useSession()
   const pathname = usePathname()
+  const router = useRouter()
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const [collapsed, setCollapsed] = useState(false)
 
-  // Determine role from session
-  const roleCode = (() => {
-    // We don't have direct access to roleCode from useSession — derive from pathname for now
-    // Real: use session.roleCode when available
-    return null
-  })()
+  useEffect(() => {
+    if (loaded && !userId) {
+      router.replace('/login')
+    }
+  }, [loaded, userId, router])
 
-  // Use a simple client-side approach to detect role from the session context
-  // Since useSession only exposes name/roleName/loaded, we use pathname heuristics
-  // and will wire up real roleCode when session logic is complete
-  const effectiveRole = roleName ?? null
-
-  const visibleGroups = getVisibleGroups(effectiveRole)
+  const visibleGroups = getVisibleGroups(roleCode)
   const [openGroups, setOpenGroups] = useState<Set<string>>(() => {
     // Auto-open groups that contain the active route
     const initial = new Set<string>()
@@ -363,6 +346,19 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
           <div className="ml-3 flex items-center gap-2">
             <Snowflake className="w-5 h-5 text-cyan-600" />
             <span className="font-bold text-slate-800 font-display">ASTADECA</span>
+          </div>
+        </header>
+
+        {/* Top bar (desktop) */}
+        <header className="hidden lg:flex items-center justify-end h-16 px-8 border-b border-slate-200 bg-white flex-shrink-0">
+          <div className="flex items-center gap-3">
+            {loaded && (
+              <div className="text-right leading-tight">
+                <p className="text-sm font-medium text-slate-700">{name ?? 'User'}</p>
+                <p className="text-xs text-slate-400">{roleName ?? 'Guest'}</p>
+              </div>
+            )}
+            <LogoutButton />
           </div>
         </header>
 

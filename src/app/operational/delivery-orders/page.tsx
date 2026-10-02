@@ -1,7 +1,7 @@
 'use client'
 
 import AppShell from '@/components/app-shell'
-import LogoutButton from '@/components/logout-button'
+import { StatusBadge } from '@/components/ui/status-badge'
 import { useSession } from '@/hooks/use-session'
 import { useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabase/client'
@@ -21,15 +21,8 @@ type DO = {
   customers: { name: string } | null
 }
 
-const STATUS_COLORS: Record<string, string> = {
-  DRAFT: 'bg-slate-100 text-slate-600',
-  PRINTED: 'bg-blue-100 text-blue-700',
-  RELEASED: 'bg-green-100 text-green-700',
-  CANCELLED: 'bg-gray-100 text-gray-600',
-}
-
 export default function DeliveryOrdersPage() {
-  const { roleName, loaded } = useSession()
+  const { roleCode, loaded } = useSession()
   const [data, setData] = useState<DO[]>([])
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
@@ -39,7 +32,7 @@ export default function DeliveryOrdersPage() {
   const [error, setError] = useState<string | null>(null)
   
 
-  const canCreate = roleName === 'DIRECTOR' || roleName === 'ADMIN'
+  const canCreate = roleCode === 'DIRECTOR' || roleCode === 'ADMIN'
 
   useEffect(() => {
     if (!loaded) return
@@ -109,9 +102,8 @@ export default function DeliveryOrdersPage() {
             <p className="mt-1 text-sm text-slate-500">Kelola surat jalan</p>
           </div>
           <div className="flex items-center gap-3">
-            <LogoutButton />
             {canCreate && (
-              <button onClick={() => setShowForm(true)} className="flex items-center gap-2 px-4 py-2 bg-cyan-600 hover:bg-cyan-700 text-white text-sm font-medium rounded-lg transition-colors">
+              <button onClick={() => setShowForm(true)} className="flex items-center gap-2 px-4 py-2 bg-primary hover:bg-primary/90 text-white text-sm font-medium rounded-lg transition-colors">
                 <Plus className="w-4 h-4" /> <span>DO Baru</span>
               </button>
             )}
@@ -124,27 +116,27 @@ export default function DeliveryOrdersPage() {
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
                 <label className="block text-sm font-medium text-slate-700 mb-1">Customer</label>
-                <select name="customer_id" className="w-full border border-slate-200 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-cyan-500">
+                <select name="customer_id" className="w-full border border-slate-200 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary">
                   <option value="">-- Pilih Customer --</option>
                   {customers.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
                 </select>
               </div>
               <div>
                 <label className="block text-sm font-medium text-slate-700 mb-1">Nama Driver</label>
-                <input type="text" name="driver_name" className="w-full border border-slate-200 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-cyan-500" />
+                <input type="text" name="driver_name" className="w-full border border-slate-200 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary" />
               </div>
               <div>
                 <label className="block text-sm font-medium text-slate-700 mb-1">No. Kendaraan</label>
-                <input type="text" name="vehicle_number" className="w-full border border-slate-200 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-cyan-500" />
+                <input type="text" name="vehicle_number" className="w-full border border-slate-200 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary" />
               </div>
               <div>
                 <label className="block text-sm font-medium text-slate-700 mb-1">Catatan</label>
-                <input type="text" name="notes" className="w-full border border-slate-200 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-cyan-500" />
+                <input type="text" name="notes" className="w-full border border-slate-200 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary" />
               </div>
             </div>
             <div className="flex gap-3 justify-end">
               <button type="button" onClick={() => setShowForm(false)} className="px-4 py-2 text-sm text-slate-600 hover:bg-slate-100 rounded-lg"><X className="w-4 h-4 inline mr-1" />Batal</button>
-              <button type="submit" disabled={saving} className="flex items-center gap-2 px-5 py-2.5 bg-cyan-600 hover:bg-cyan-700 text-white text-sm font-medium rounded-lg disabled:opacity-60">
+              <button type="submit" disabled={saving} className="flex items-center gap-2 px-5 py-2.5 bg-primary hover:bg-primary/90 text-white text-sm font-medium rounded-lg disabled:opacity-60">
                 {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Plus className="w-4 h-4" />}
                 {saving ? 'Menyimpan...' : 'Simpan'}
               </button>
@@ -154,10 +146,10 @@ export default function DeliveryOrdersPage() {
 
         <div className="relative mb-4">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-          <input type="text" placeholder="Cari DO, customer, atau driver..." value={search} onChange={(e) => setSearch(e.target.value)} className="w-full pl-10 pr-4 py-2.5 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-cyan-500" />
+          <input type="text" placeholder="Cari DO, customer, atau driver..." value={search} onChange={(e) => setSearch(e.target.value)} className="w-full pl-10 pr-4 py-2.5 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary" />
         </div>
 
-        <div className="bg-white rounded-xl border border-slate-200 overflow-hidden">
+        <div className="bg-white rounded-xl border border-slate-200 overflow-hidden overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
               <tr className="bg-slate-50 border-b border-slate-200">
@@ -182,7 +174,7 @@ export default function DeliveryOrdersPage() {
                     <td className="px-4 py-3 text-slate-600">{row.driver_name ?? '-'}</td>
                     <td className="px-4 py-3 font-mono text-slate-600">{row.vehicle_number ?? '-'}</td>
                     <td className="px-4 py-3 text-center">
-                      <span className={`inline-flex px-2 py-0.5 rounded-full text-xs font-medium ${STATUS_COLORS[row.status] ?? 'bg-slate-100 text-slate-600'}`}>{row.status}</span>
+                      <StatusBadge status={row.status} />
                     </td>
                     <td className="px-4 py-3 text-right text-slate-500 text-xs">{new Date(row.created_at).toLocaleDateString('id-ID')}</td>
                   </tr>

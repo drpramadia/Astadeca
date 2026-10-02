@@ -1,7 +1,6 @@
 'use client'
 
 import AppShell from '@/components/app-shell'
-import LogoutButton from '@/components/logout-button'
 import { useSession } from '@/hooks/use-session'
 import { useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabase/client'
@@ -56,17 +55,16 @@ export default function GoodsReceiptsPage() {
         <div className="flex items-start justify-between mb-6">
           <div>
             <h1 className="text-2xl font-bold text-slate-800 font-display">Penerimaan Barang</h1>
-            <p className="mt-1 text-sm text-slate-500">Goods Receipt — barang masuk dari supplier</p>
+            <p className="mt-1 text-sm text-slate-500">Goods Receipt â€” barang masuk dari supplier</p>
           </div>
-          <LogoutButton />
         </div>
 
         <div className="relative mb-4">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-          <input type="text" placeholder="Cari GR number atau PO..." value={search} onChange={(e) => setSearch(e.target.value)} className="w-full pl-10 pr-4 py-2.5 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-cyan-500" />
+          <input type="text" placeholder="Cari GR number atau PO..." value={search} onChange={(e) => setSearch(e.target.value)} className="w-full pl-10 pr-4 py-2.5 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary" />
         </div>
 
-        <div className="bg-white rounded-xl border border-slate-200 overflow-hidden">
+        <div className="bg-white rounded-xl border border-slate-200 overflow-hidden overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
               <tr className="bg-slate-50 border-b border-slate-200">

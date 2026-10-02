@@ -1,7 +1,6 @@
 'use client'
 
 import AppShell from '@/components/app-shell'
-import LogoutButton from '@/components/logout-button'
 import { useSession } from '@/hooks/use-session'
 import { useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabase/client'
@@ -28,7 +27,7 @@ interface ContractFormData {
 }
 
 export default function NewContractPage() {
-  const { roleName, loaded } = useSession()
+  const { roleCode, loaded } = useSession()
   const router = useRouter()
   
   const [customers, setCustomers] = useState<Customer[]>([])
@@ -42,7 +41,7 @@ export default function NewContractPage() {
   })
   const { fields, append, remove } = useFieldArray({ control, name: 'items' })
 
-  const canAccess = roleName === 'DIRECTOR' || roleName === 'ADMIN'
+  const canAccess = roleCode === 'DIRECTOR' || roleCode === 'ADMIN'
 
   useEffect(() => {
     if (!loaded) return
@@ -80,7 +79,7 @@ export default function NewContractPage() {
       price_per_kg_per_day: parseFloat(form.price_per_kg_per_day) || 0,
       total_estimated_kg: parseFloat(form.total_estimated_kg) || 0,
       notes: form.notes || null,
-      status: roleName === 'DIRECTOR' ? 'ACTIVE' : 'DRAFT',
+      status: roleCode === 'DIRECTOR' ? 'ACTIVE' : 'DRAFT',
       created_by: userData.user?.id,
     }).select().single()
 
@@ -102,7 +101,6 @@ export default function NewContractPage() {
             </div>
             <p className="text-sm text-slate-500">Buat kontrak sewa cold storage baru</p>
           </div>
-          <LogoutButton />
         </div>
 
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
@@ -123,7 +121,7 @@ export default function NewContractPage() {
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
                 <label className="block text-sm font-medium text-slate-700 mb-1">Customer *</label>
-                <select {...register('customer_id', { required: 'Wajib dipilih' })} className="w-full border border-slate-200 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-cyan-500">
+                <select {...register('customer_id', { required: 'Wajib dipilih' })} className="w-full border border-slate-200 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary">
                   <option value="">-- Pilih Customer --</option>
                   {customers.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
                 </select>
@@ -131,7 +129,7 @@ export default function NewContractPage() {
               </div>
               <div>
                 <label className="block text-sm font-medium text-slate-700 mb-1">Cold Storage</label>
-                <select {...register('cold_storage_id')} className="w-full border border-slate-200 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-cyan-500">
+                <select {...register('cold_storage_id')} className="w-full border border-slate-200 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary">
                   <option value="">-- Pilih --</option>
                   {coldStorages.map((cs) => <option key={cs.id} value={cs.id}>{cs.name}</option>)}
                 </select>
@@ -141,34 +139,34 @@ export default function NewContractPage() {
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
               <div>
                 <label className="block text-sm font-medium text-slate-700 mb-1">Tgl Mulai *</label>
-                <input type="date" {...register('start_date', { required: 'Wajib diisi' })} className="w-full border border-slate-200 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-cyan-500" />
+                <input type="date" {...register('start_date', { required: 'Wajib diisi' })} className="w-full border border-slate-200 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary" />
                 {errors.start_date && <p className="text-xs text-red-500 mt-1">{errors.start_date.message as string}</p>}
               </div>
               <div>
                 <label className="block text-sm font-medium text-slate-700 mb-1">Tgl Selesai *</label>
-                <input type="date" {...register('end_date', { required: 'Wajib diisi' })} className="w-full border border-slate-200 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-cyan-500" />
+                <input type="date" {...register('end_date', { required: 'Wajib diisi' })} className="w-full border border-slate-200 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary" />
                 {errors.end_date && <p className="text-xs text-red-500 mt-1">{errors.end_date.message as string}</p>}
               </div>
               <div>
                 <label className="block text-sm font-medium text-slate-700 mb-1">Estimasi Kg</label>
-                <input type="number" step="0.01" {...register('total_estimated_kg')} placeholder="0" className="w-full border border-slate-200 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-cyan-500" />
+                <input type="number" step="0.01" {...register('total_estimated_kg')} placeholder="0" className="w-full border border-slate-200 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary" />
               </div>
             </div>
 
             <div>
               <label className="block text-sm font-medium text-slate-700 mb-1">Tarif per Kg/Hari (Rp)</label>
-              <input type="number" step="0.01" {...register('price_per_kg_per_day')} placeholder="0" className="w-full border border-slate-200 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-cyan-500" />
+              <input type="number" step="0.01" {...register('price_per_kg_per_day')} placeholder="0" className="w-full border border-slate-200 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary" />
             </div>
 
             <div>
               <label className="block text-sm font-medium text-slate-700 mb-1">Catatan</label>
-              <textarea {...register('notes')} rows={3} className="w-full border border-slate-200 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-cyan-500 resize-none" />
+              <textarea {...register('notes')} rows={3} className="w-full border border-slate-200 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary resize-none" />
             </div>
           </div>
 
           <div className="flex justify-end gap-3">
             <Link href="/cold-storage/contracts" className="px-4 py-2 text-sm text-slate-600 hover:text-slate-800 rounded-lg hover:bg-slate-100 transition-colors">Batal</Link>
-            <button type="submit" disabled={saving} className="flex items-center gap-2 px-5 py-2.5 bg-cyan-600 hover:bg-cyan-700 text-white text-sm font-medium rounded-lg transition-colors disabled:opacity-60">
+            <button type="submit" disabled={saving} className="flex items-center gap-2 px-5 py-2.5 bg-primary hover:bg-primary/90 text-white text-sm font-medium rounded-lg transition-colors disabled:opacity-60">
               {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Plus className="w-4 h-4" />}
               <span>{saving ? 'Menyimpan...' : 'Simpan'}</span>
             </button>

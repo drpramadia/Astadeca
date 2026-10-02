@@ -1,7 +1,6 @@
 'use client'
 
 import AppShell from '@/components/app-shell'
-import LogoutButton from '@/components/logout-button'
 import { useSession } from '@/hooks/use-session'
 import { useEffect } from 'react'
 import { useRouter } from 'next/navigation'
@@ -19,7 +18,7 @@ import {
   DollarSign,
 } from 'lucide-react'
 
-// ─── Stat card ───────────────────────────────────────────────────────────────
+// â”€â”€â”€ Stat card â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 function StatCard({
   label,
@@ -63,7 +62,7 @@ function StatCard({
   return inner
 }
 
-// ─── Quick link card ──────────────────────────────────────────────────────────
+// â”€â”€â”€ Quick link card â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 function QuickLink({
   label,
@@ -100,7 +99,7 @@ function QuickLink({
   )
 }
 
-// ─── Dashboard page ──────────────────────────────────────────────────────────
+// â”€â”€â”€ Dashboard page â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 export default function DashboardPage() {
   const { name, roleName, loaded, userId } = useSession()
@@ -144,11 +143,11 @@ export default function DashboardPage() {
         <div className="flex items-start justify-between mb-8">
           <div>
             <h1 className="text-2xl font-bold text-slate-800 font-display">
-              {greeting}{loaded && name ? `, ${name.split(' ')[0]}` : ''} 👋
+              {greeting}{loaded && name ? `, ${name.split(' ')[0]}` : ''} ðŸ‘‹
             </h1>
             <p className="mt-1 text-sm text-slate-500">
               {loaded && roleName
-                ? `Login sebagai ${roleName} · ${new Date().toLocaleDateString('id-ID', {
+                ? `Login sebagai ${roleName} Â· ${new Date().toLocaleDateString('id-ID', {
                     weekday: 'long',
                     year: 'numeric',
                     month: 'long',
@@ -156,9 +155,6 @@ export default function DashboardPage() {
                   })}`
                 : 'Memuat...'}
             </p>
-          </div>
-          <div className="hidden sm:flex items-center gap-3">
-            <LogoutButton />
           </div>
         </div>
 

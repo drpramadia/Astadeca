@@ -1,7 +1,6 @@
 'use client'
 
 import AppShell from '@/components/app-shell'
-import LogoutButton from '@/components/logout-button'
 import Link from 'next/link'
 import {
   ShoppingCart,
@@ -51,7 +50,6 @@ export default function PurchasePage() {
               {new Date().toLocaleDateString('id-ID', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
             </p>
           </div>
-          <LogoutButton />
         </div>
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
           <ModuleCard label="Purchase Order" description="Kelola pesanan pembelian" href="/operational/purchase-orders" icon={ShoppingCart} color="#0ea5e9" />

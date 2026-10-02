@@ -50,12 +50,12 @@ export function formatCurrency(
  * Get Tailwind CSS tone class based on status keyword
  */
 export function getBadgeTone(status: string): string {
-  const s = status.toLowerCase()
+  const s = (status ?? '').toLowerCase().replace(/_/g, ' ')
   if (['active', 'available', 'approved', 'good', 'released', 'printed'].includes(s))
     return 'bg-success/10 text-success'
-  if (['pending', 'draft', 'quarantine', 'reserved'].includes(s))
+  if (['pending', 'pending approval', 'draft', 'quarantine', 'reserved'].includes(s))
     return 'bg-warning/10 text-warning'
-  if (['rejected', 'cancelled', 'damaged', 'rejected', 'danger'].includes(s))
+  if (['rejected', 'cancelled', 'canceled', 'damaged', 'danger'].includes(s))
     return 'bg-danger/10 text-danger'
   if (['inactive', 'used', 'expired'].includes(s))
     return 'bg-slate-100 text-slate-500'

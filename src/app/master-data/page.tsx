@@ -1,7 +1,6 @@
 'use client'
 
 import AppShell from '@/components/app-shell'
-import LogoutButton from '@/components/logout-button'
 import Link from 'next/link'
 import { Tag, Building2, Truck, ArrowRight } from 'lucide-react'
 
@@ -43,7 +42,6 @@ export default function MasterDataPage() {
               {new Date().toLocaleDateString('id-ID', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
             </p>
           </div>
-          <LogoutButton />
         </div>
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
           <ModuleCard label="Products" description="Kelola produk dan SKU" href="/master/products" icon={Tag} color="#8b5cf6" />

@@ -1,7 +1,7 @@
 'use client'
 
 import AppShell from '@/components/app-shell'
-import LogoutButton from '@/components/logout-button'
+import { StatusBadge } from '@/components/ui/status-badge'
 import { useSession } from '@/hooks/use-session'
 import { useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabase/client'
@@ -25,20 +25,14 @@ const TYPE_LABELS: Record<string, string> = {
   DELIVERY: 'Delivery Request',
 }
 
-const STATUS_COLORS: Record<string, string> = {
-  PENDING: 'bg-amber-100 text-amber-700',
-  APPROVED: 'bg-green-100 text-green-700',
-  REJECTED: 'bg-red-100 text-red-700',
-}
-
 export default function ApprovalPage() {
-  const { roleName, loaded } = useSession()
+  const { roleCode, loaded } = useSession()
   const [data, setData] = useState<Approval[]>([])
   const [loading, setLoading] = useState(true)
   const [processing, setProcessing] = useState<string | null>(null)
   
 
-  const canApprove = roleName === 'DIRECTOR'
+  const canApprove = roleCode === 'DIRECTOR'
 
   useEffect(() => {
     if (!loaded) return
@@ -86,7 +80,6 @@ export default function ApprovalPage() {
             <h1 className="text-2xl font-bold text-slate-800 font-display">Approval</h1>
             <p className="mt-1 text-sm text-slate-500">Setujui atau tolak request yang pending</p>
           </div>
-          <LogoutButton />
         </div>
 
         <div className="space-y-4">
@@ -113,7 +106,7 @@ export default function ApprovalPage() {
                     </div>
                   </div>
                   <div className="flex flex-col items-end gap-2 flex-shrink-0">
-                    <span className={`inline-flex px-2 py-0.5 rounded-full text-xs font-medium ${STATUS_COLORS[row.status] ?? 'bg-slate-100 text-slate-600'}`}>{row.status}</span>
+                    <StatusBadge status={row.status} />
                     {row.status === 'PENDING' && canApprove && (
                       <div className="flex gap-2">
                         <button onClick={() => handleDecision(row.id, 'APPROVED')} disabled={processing === row.id} className="flex items-center gap-1 px-3 py-1.5 bg-green-600 hover:bg-green-700 text-white text-xs font-medium rounded-lg transition-colors disabled:opacity-60">

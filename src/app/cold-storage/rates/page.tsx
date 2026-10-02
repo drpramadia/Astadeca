@@ -1,12 +1,12 @@
 'use client'
 
 import AppShell from '@/components/app-shell'
-import LogoutButton from '@/components/logout-button'
+import { StatusBadge } from '@/components/ui/status-badge'
 import { useSession } from '@/hooks/use-session'
 import { useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabase/client'
 import Link from 'next/link'
-import { Plus, Search, DollarSign, Loader2, Pencil, Trash2 } from 'lucide-react'
+import { Plus, DollarSign, Loader2, Pencil, Trash2 } from 'lucide-react'
 
 const ORG_ID = '20000000-0000-0000-0000-000000000001'
 
@@ -20,13 +20,8 @@ type Rate = {
   cold_storages: { name: string } | null
 }
 
-const STATUS_COLORS: Record<string, string> = {
-  ACTIVE: 'bg-green-100 text-green-700',
-  INACTIVE: 'bg-slate-100 text-slate-600',
-}
-
 export default function RatesPage() {
-  const { roleName, loaded } = useSession()
+  const { roleCode, loaded } = useSession()
   const [data, setData] = useState<Rate[]>([])
   const [loading, setLoading] = useState(true)
   const [showForm, setShowForm] = useState(false)
@@ -37,7 +32,7 @@ export default function RatesPage() {
   const [coldStorages, setColdStorages] = useState<{ id: string; name: string }[]>([])
   
 
-  const canEdit = roleName === 'DIRECTOR' || roleName === 'ADMIN'
+  const canEdit = roleCode === 'DIRECTOR' || roleCode === 'ADMIN'
 
   useEffect(() => {
     if (!loaded) return
@@ -114,9 +109,8 @@ export default function RatesPage() {
             <p className="mt-1 text-sm text-slate-500">Atur tarif sewa per kg/hari</p>
           </div>
           <div className="flex items-center gap-3">
-            <LogoutButton />
             {canEdit && (
-              <button onClick={() => { setShowForm(true); setEditId(null); setFormData({ cold_storage_id: '', price_per_kg_per_day: '', minimum_days: '1', minimum_kg: '0' }) }} className="flex items-center gap-2 px-4 py-2 bg-cyan-600 hover:bg-cyan-700 text-white text-sm font-medium rounded-lg transition-colors">
+              <button onClick={() => { setShowForm(true); setEditId(null); setFormData({ cold_storage_id: '', price_per_kg_per_day: '', minimum_days: '1', minimum_kg: '0' }) }} className="flex items-center gap-2 px-4 py-2 bg-primary hover:bg-primary/90 text-white text-sm font-medium rounded-lg transition-colors">
                 <Plus className="w-4 h-4" /> <span>Baru</span>
               </button>
             )}
@@ -129,27 +123,27 @@ export default function RatesPage() {
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
               <div>
                 <label className="block text-sm font-medium text-slate-700 mb-1">Cold Storage</label>
-                <select value={formData.cold_storage_id} onChange={(e) => setFormData({ ...formData, cold_storage_id: e.target.value })} className="w-full border border-slate-200 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-cyan-500">
+                <select value={formData.cold_storage_id} onChange={(e) => setFormData({ ...formData, cold_storage_id: e.target.value })} className="w-full border border-slate-200 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary">
                   <option value="">Semua</option>
                   {coldStorages.map((cs) => <option key={cs.id} value={cs.id}>{cs.name}</option>)}
                 </select>
               </div>
               <div>
                 <label className="block text-sm font-medium text-slate-700 mb-1">Tarif/kg/hari (Rp) *</label>
-                <input type="number" step="0.01" value={formData.price_per_kg_per_day} onChange={(e) => setFormData({ ...formData, price_per_kg_per_day: e.target.value })} required className="w-full border border-slate-200 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-cyan-500" />
+                <input type="number" step="0.01" value={formData.price_per_kg_per_day} onChange={(e) => setFormData({ ...formData, price_per_kg_per_day: e.target.value })} required className="w-full border border-slate-200 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary" />
               </div>
               <div>
                 <label className="block text-sm font-medium text-slate-700 mb-1">Min. Hari</label>
-                <input type="number" value={formData.minimum_days} onChange={(e) => setFormData({ ...formData, minimum_days: e.target.value })} className="w-full border border-slate-200 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-cyan-500" />
+                <input type="number" value={formData.minimum_days} onChange={(e) => setFormData({ ...formData, minimum_days: e.target.value })} className="w-full border border-slate-200 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary" />
               </div>
               <div>
                 <label className="block text-sm font-medium text-slate-700 mb-1">Min. Kg</label>
-                <input type="number" step="0.01" value={formData.minimum_kg} onChange={(e) => setFormData({ ...formData, minimum_kg: e.target.value })} className="w-full border border-slate-200 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-cyan-500" />
+                <input type="number" step="0.01" value={formData.minimum_kg} onChange={(e) => setFormData({ ...formData, minimum_kg: e.target.value })} className="w-full border border-slate-200 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary" />
               </div>
             </div>
             <div className="flex gap-3 justify-end">
               <button type="button" onClick={() => { setShowForm(false); setEditId(null) }} className="px-4 py-2 text-sm text-slate-600 hover:bg-slate-100 rounded-lg">Batal</button>
-              <button type="submit" disabled={saving} className="flex items-center gap-2 px-5 py-2.5 bg-cyan-600 hover:bg-cyan-700 text-white text-sm font-medium rounded-lg disabled:opacity-60">
+              <button type="submit" disabled={saving} className="flex items-center gap-2 px-5 py-2.5 bg-primary hover:bg-primary/90 text-white text-sm font-medium rounded-lg disabled:opacity-60">
                 {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Plus className="w-4 h-4" />}
                 {saving ? 'Menyimpan...' : editId ? 'Update' : 'Simpan'}
               </button>
@@ -157,7 +151,7 @@ export default function RatesPage() {
           </form>
         )}
 
-        <div className="bg-white rounded-xl border border-slate-200 overflow-hidden">
+        <div className="bg-white rounded-xl border border-slate-200 overflow-hidden overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
               <tr className="bg-slate-50 border-b border-slate-200">
@@ -182,7 +176,7 @@ export default function RatesPage() {
                     <td className="px-4 py-3 text-right font-mono text-slate-700">{row.minimum_days}</td>
                     <td className="px-4 py-3 text-right font-mono text-slate-700">{row.minimum_kg.toLocaleString('id-ID')} kg</td>
                     <td className="px-4 py-3 text-center">
-                      <span className={`inline-flex px-2 py-0.5 rounded-full text-xs font-medium ${STATUS_COLORS[row.status] ?? 'bg-slate-100 text-slate-600'}`}>{row.status}</span>
+                      <StatusBadge status={row.status} />
                     </td>
                     {canEdit && (
                       <td className="px-4 py-3 text-right">

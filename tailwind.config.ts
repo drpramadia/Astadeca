@@ -1,7 +1,7 @@
 import type { Config } from 'tailwindcss'
 
 const config: Config = {
-  content: ['app/**/*.tsx', 'components/**/*.tsx'],
+  content: ['./src/**/*.{ts,tsx}'],
   theme: {
     extend: {
       colors: {
@@ -14,8 +14,8 @@ const config: Config = {
         warning: '#f59e0b',
       },
       fontFamily: {
-        sans: ['DM Sans', 'sans-serif'],
-        display: ['DM Display', 'sans-serif'],
+        sans: ['var(--font-dm-sans)', 'ui-sans-serif', 'system-ui', 'sans-serif'],
+        display: ['var(--font-dm-display)', 'ui-sans-serif', 'system-ui', 'sans-serif'],
       },
     },
   },

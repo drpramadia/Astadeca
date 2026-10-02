@@ -1,7 +1,6 @@
 'use client'
 
 import AppShell from '@/components/app-shell'
-import LogoutButton from '@/components/logout-button'
 import { useSession } from '@/hooks/use-session'
 import { useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabase/client'
@@ -17,7 +16,7 @@ type Product = { id: string; name: string; sku: string }
 type LineItem = { product_id: string; quantity_kg: string; price_per_kg: string }
 
 export default function NewSOPage() {
-  const { roleName, loaded } = useSession()
+  const { roleCode, loaded } = useSession()
   const router = useRouter()
   
   const [customers, setCustomers] = useState<Customer[]>([])
@@ -29,7 +28,7 @@ export default function NewSOPage() {
   const [loadingRefs, setLoadingRefs] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
-  const canAccess = roleName === 'DIRECTOR' || roleName === 'ADMIN'
+  const canAccess = roleCode === 'DIRECTOR' || roleCode === 'ADMIN'
 
   useEffect(() => {
     if (!loaded) return
@@ -69,7 +68,7 @@ export default function NewSOPage() {
       customer_id: customerId,
       so_number: soNumber,
       notes: notes || null,
-      status: roleName === 'DIRECTOR' ? 'APPROVED' : 'DRAFT',
+      status: roleCode === 'DIRECTOR' ? 'APPROVED' : 'DRAFT',
       created_by: userData.user?.id,
     }).select().single()
 
@@ -101,7 +100,6 @@ export default function NewSOPage() {
             </div>
             <p className="text-sm text-slate-500">Buat sales order baru</p>
           </div>
-          <LogoutButton />
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-5">
@@ -117,14 +115,14 @@ export default function NewSOPage() {
           <div className={loadingRefs ? "bg-white rounded-xl border border-slate-200 p-6 space-y-5 opacity-50 pointer-events-none" : "bg-white rounded-xl border border-slate-200 p-6 space-y-5"}>
             <div>
               <label className="block text-sm font-medium text-slate-700 mb-1">Customer *</label>
-              <select value={customerId} onChange={(e) => setCustomerId(e.target.value)} required className="w-full border border-slate-200 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-cyan-500">
+              <select value={customerId} onChange={(e) => setCustomerId(e.target.value)} required className="w-full border border-slate-200 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary">
                 <option value="">-- Pilih Customer --</option>
                 {customers.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
               </select>
             </div>
             <div>
               <label className="block text-sm font-medium text-slate-700 mb-1">Catatan</label>
-              <textarea value={notes} onChange={(e) => setNotes(e.target.value)} rows={2} className="w-full border border-slate-200 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-cyan-500 resize-none" />
+              <textarea value={notes} onChange={(e) => setNotes(e.target.value)} rows={2} className="w-full border border-slate-200 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary resize-none" />
             </div>
           </div>
 
@@ -139,16 +137,16 @@ export default function NewSOPage() {
               {items.map((item, idx) => (
                 <div key={idx} className="flex gap-3 items-start">
                   <div className="flex-1">
-                    <select value={item.product_id} onChange={(e) => updateItem(idx, 'product_id', e.target.value)} className="w-full border border-slate-200 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-cyan-500">
+                    <select value={item.product_id} onChange={(e) => updateItem(idx, 'product_id', e.target.value)} className="w-full border border-slate-200 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary">
                       <option value="">-- Pilih Produk --</option>
                       {products.map((p) => <option key={p.id} value={p.id}>{p.name} ({p.sku})</option>)}
                     </select>
                   </div>
                   <div className="w-32">
-                    <input type="number" step="0.01" placeholder="Qty (kg)" value={item.quantity_kg} onChange={(e) => updateItem(idx, 'quantity_kg', e.target.value)} className="w-full border border-slate-200 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-cyan-500" />
+                    <input type="number" step="0.01" placeholder="Qty (kg)" value={item.quantity_kg} onChange={(e) => updateItem(idx, 'quantity_kg', e.target.value)} className="w-full border border-slate-200 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary" />
                   </div>
                   <div className="w-36">
-                    <input type="number" step="0.01" placeholder="Harga/kg (Rp)" value={item.price_per_kg} onChange={(e) => updateItem(idx, 'price_per_kg', e.target.value)} className="w-full border border-slate-200 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-cyan-500" />
+                    <input type="number" step="0.01" placeholder="Harga/kg (Rp)" value={item.price_per_kg} onChange={(e) => updateItem(idx, 'price_per_kg', e.target.value)} className="w-full border border-slate-200 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary" />
                   </div>
                   <div className="w-32 pt-2.5 text-sm font-mono text-slate-500 text-right">
                     {item.quantity_kg && item.price_per_kg ? `Rp ${(parseFloat(item.quantity_kg) * parseFloat(item.price_per_kg)).toLocaleString('id-ID')}` : 'Rp 0'}
@@ -161,7 +159,7 @@ export default function NewSOPage() {
 
           <div className="flex justify-end gap-3">
             <Link href="/operational/sales-orders" className="px-4 py-2 text-sm text-slate-600 hover:bg-slate-100 rounded-lg">Batal</Link>
-            <button type="submit" disabled={saving} className="flex items-center gap-2 px-5 py-2.5 bg-cyan-600 hover:bg-cyan-700 text-white text-sm font-medium rounded-lg disabled:opacity-60">
+            <button type="submit" disabled={saving} className="flex items-center gap-2 px-5 py-2.5 bg-primary hover:bg-primary/90 text-white text-sm font-medium rounded-lg disabled:opacity-60">
               {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Plus className="w-4 h-4" />}
               {saving ? 'Menyimpan...' : 'Simpan SO'}
             </button>

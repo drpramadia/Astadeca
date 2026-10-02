@@ -1,7 +1,7 @@
 'use client'
 
 import AppShell from '@/components/app-shell'
-import LogoutButton from '@/components/logout-button'
+import { StatusBadge } from '@/components/ui/status-badge'
 import { useSession } from '@/hooks/use-session'
 import { useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabase/client'
@@ -24,23 +24,15 @@ type Contract = {
   cold_storages: { name: string } | null
 }
 
-const STATUS_COLORS: Record<string, string> = {
-  DRAFT: 'bg-slate-100 text-slate-600',
-  PENDING_APPROVAL: 'bg-amber-100 text-amber-700',
-  ACTIVE: 'bg-green-100 text-green-700',
-  EXPIRED: 'bg-red-100 text-red-700',
-  CANCELLED: 'bg-gray-100 text-gray-600',
-}
-
 export default function ContractsPage() {
-  const { roleName, loaded } = useSession()
+  const { roleCode, loaded } = useSession()
   const [data, setData] = useState<Contract[]>([])
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
   const [statusFilter, setStatusFilter] = useState('')
   
 
-  const canAccess = roleName === 'DIRECTOR' || roleName === 'ADMIN'
+  const canAccess = roleCode === 'DIRECTOR' || roleCode === 'ADMIN'
 
   useEffect(() => {
     if (!loaded || !canAccess) return
@@ -91,9 +83,8 @@ export default function ContractsPage() {
             <p className="mt-1 text-sm text-slate-500">Daftar kontrak sewa cold storage</p>
           </div>
           <div className="flex items-center gap-3">
-            <LogoutButton />
             {canAccess && (
-              <Link href="/cold-storage/contracts/new" className="flex items-center gap-2 px-4 py-2 bg-cyan-600 hover:bg-cyan-700 text-white text-sm font-medium rounded-lg transition-colors">
+              <Link href="/cold-storage/contracts/new" className="flex items-center gap-2 px-4 py-2 bg-primary hover:bg-primary/90 text-white text-sm font-medium rounded-lg transition-colors">
                 <Plus className="w-4 h-4" /> <span>Baru</span>
               </Link>
             )}
@@ -103,9 +94,9 @@ export default function ContractsPage() {
         <div className="flex gap-3 mb-4">
           <div className="relative flex-1">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-            <input type="text" placeholder="Cari nomor kontrak atau customer..." value={search} onChange={(e) => setSearch(e.target.value)} className="w-full pl-10 pr-4 py-2.5 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-cyan-500" />
+            <input type="text" placeholder="Cari nomor kontrak atau customer..." value={search} onChange={(e) => setSearch(e.target.value)} className="w-full pl-10 pr-4 py-2.5 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary" />
           </div>
-          <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)} className="border border-slate-200 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-cyan-500">
+          <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)} className="border border-slate-200 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary">
             <option value="">Semua Status</option>
             <option value="DRAFT">Draft</option>
             <option value="PENDING_APPROVAL">Pending Approval</option>
@@ -115,7 +106,7 @@ export default function ContractsPage() {
           </select>
         </div>
 
-        <div className="bg-white rounded-xl border border-slate-200 overflow-hidden">
+        <div className="bg-white rounded-xl border border-slate-200 overflow-hidden overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
               <tr className="bg-slate-50 border-b border-slate-200">
@@ -145,7 +136,7 @@ export default function ContractsPage() {
                       {new Date(row.start_date).toLocaleDateString('id-ID')} - {new Date(row.end_date).toLocaleDateString('id-ID')}
                     </td>
                     <td className="px-4 py-3 text-center">
-                      <span className={`inline-flex px-2 py-0.5 rounded-full text-xs font-medium ${STATUS_COLORS[row.status] ?? 'bg-slate-100 text-slate-600'}`}>{row.status}</span>
+                      <StatusBadge status={row.status} />
                     </td>
                   </tr>
                 ))

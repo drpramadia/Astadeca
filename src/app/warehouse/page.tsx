@@ -1,7 +1,6 @@
 'use client'
 
 import AppShell from '@/components/app-shell'
-import LogoutButton from '@/components/logout-button'
 import Link from 'next/link'
 import {
   Warehouse,
@@ -49,12 +48,11 @@ export default function WarehousePage() {
               {new Date().toLocaleDateString('id-ID', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
             </p>
           </div>
-          <LogoutButton />
         </div>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          <ModuleCard label="Penerimaan Barang" description="Goods receipt — barang masuk dari supplier" href="/warehouse/goods-receipts" icon={ArrowDownToLine} color="#22c55e" />
-          <ModuleCard label="Pengeluaran Barang" description="Goods issue — pelepasan stok barang" href="/warehouse/goods-issues" icon={ArrowUpFromLine} color="#f59e0b" />
+          <ModuleCard label="Penerimaan Barang" description="Goods receipt â€” barang masuk dari supplier" href="/warehouse/goods-receipts" icon={ArrowDownToLine} color="#22c55e" />
+          <ModuleCard label="Pengeluaran Barang" description="Goods issue â€” pelepasan stok barang" href="/warehouse/goods-issues" icon={ArrowUpFromLine} color="#f59e0b" />
           <ModuleCard label="Inventory" description="Lihat stok barang di gudang" href="/warehouse/inventory" icon={Boxes} color="#8b5cf6" />
           <ModuleCard label="QC Inspection" description="Inspeksi kualitas barang masuk" href="/warehouse/qc" icon={Warehouse} color="#ef4444" />
         </div>
