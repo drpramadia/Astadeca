@@ -106,7 +106,7 @@ export default function LoginPage() {
         <div className="bg-white/5 backdrop-blur-md border border-white/10 rounded-2xl shadow-2xl overflow-hidden">
           {/* Header */}
           <div className="px-8 pt-10 pb-6 text-center border-b border-white/5">
-            <div className="inline-flex items-center justify-center w-16 h-16 rounded-xl mb-4 bg-white/95 p-2">
+            <div className="inline-flex items-center justify-center w-16 h-16 rounded-xl mb-4">
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img src="/logo/astadeca.png" alt="Astadeca Baswara Persada" className="w-full h-full object-contain" />
             </div>

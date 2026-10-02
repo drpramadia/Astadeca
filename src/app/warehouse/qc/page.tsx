@@ -7,8 +7,6 @@ import { useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabase/client'
 import { Search, CheckCircle, XCircle, Loader2, AlertCircle } from 'lucide-react'
 
-const ORG_ID = '20000000-0000-0000-0000-000000000001'
-
 type QC = {
   id: string
   status: string
@@ -19,7 +17,7 @@ type QC = {
 }
 
 export default function QCPage() {
-  const { loaded } = useSession()
+  const { loaded, organizationId } = useSession()
   const [data, setData] = useState<QC[]>([])
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
@@ -35,7 +33,7 @@ export default function QCPage() {
     const { data: rows } = await supabase
       .from('qc_inspections')
       .select('*, goods_receipts(gr_number), profiles(full_name)')
-      .eq('organization_id', ORG_ID)
+      .eq('organization_id', organizationId)
       .order('inspected_at', { ascending: false })
       .limit(100)
     setData((rows as QC[]) || [])

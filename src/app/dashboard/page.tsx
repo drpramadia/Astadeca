@@ -16,9 +16,9 @@ import {
   TrendingUp,
   Boxes,
   DollarSign,
+  BarChart3,
+  Activity,
 } from 'lucide-react'
-
-// â”€â”€â”€ Stat card â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 function StatCard({
   label,
@@ -62,8 +62,6 @@ function StatCard({
   return inner
 }
 
-// â”€â”€â”€ Quick link card â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-
 function QuickLink({
   label,
   description,
@@ -99,20 +97,16 @@ function QuickLink({
   )
 }
 
-// â”€â”€â”€ Dashboard page â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-
 export default function DashboardPage() {
   const { name, roleName, loaded, userId } = useSession()
   const router = useRouter()
 
-  // Redirect to login if not authenticated
   useEffect(() => {
     if (loaded && !userId) {
       router.replace('/login')
     }
   }, [loaded, userId, router])
 
-  // Show loading while checking auth
   if (!loaded || !userId) {
     return (
       <AppShell>
@@ -139,15 +133,14 @@ export default function DashboardPage() {
   return (
     <AppShell>
       <div className="p-6 lg:p-8 max-w-7xl mx-auto">
-        {/* Header */}
         <div className="flex items-start justify-between mb-8">
           <div>
             <h1 className="text-2xl font-bold text-slate-800 font-display">
-              {greeting}{loaded && name ? `, ${name.split(' ')[0]}` : ''} ðŸ‘‹
+              {greeting}{loaded && name ? `, ${name.split(' ')[0]}` : ''} 👋
             </h1>
             <p className="mt-1 text-sm text-slate-500">
               {loaded && roleName
-                ? `Login sebagai ${roleName} Â· ${new Date().toLocaleDateString('id-ID', {
+                ? `Login sebagai ${roleName} · ${new Date().toLocaleDateString('id-ID', {
                     weekday: 'long',
                     year: 'numeric',
                     month: 'long',
@@ -158,7 +151,6 @@ export default function DashboardPage() {
           </div>
         </div>
 
-        {/* Stats row */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
           <StatCard
             label="Kontrak Aktif"
@@ -191,7 +183,6 @@ export default function DashboardPage() {
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          {/* Quick links */}
           <div className="lg:col-span-2">
             <h2 className="text-base font-semibold text-slate-800 mb-4">Navigasi Cepat</h2>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -237,12 +228,24 @@ export default function DashboardPage() {
                 icon={ClipboardCheck}
                 color="#ef4444"
               />
+              <QuickLink
+                label="Finance"
+                description="Laporan keuangan & transaksi"
+                href="/finance"
+                icon={BarChart3}
+                color="#8b5cf6"
+              />
+              <QuickLink
+                label="Documents"
+                description="Dokumen & cetakan surat jalan"
+                href="/documents"
+                icon={FileText}
+                color="#086b76"
+              />
             </div>
           </div>
 
-          {/* Right column */}
           <div className="space-y-6">
-            {/* Warehouse overview */}
             <div className="bg-white rounded-xl border border-slate-200 p-5">
               <div className="flex items-center gap-2 mb-4">
                 <TrendingUp className="w-4 h-4 text-cyan-600" />
@@ -268,7 +271,27 @@ export default function DashboardPage() {
               </div>
             </div>
 
-            {/* Cold Storage status */}
+            <div className="bg-white rounded-xl border border-slate-200 p-5">
+              <div className="flex items-center gap-2 mb-4">
+                <DollarSign className="w-4 h-4 text-cyan-600" />
+                <h3 className="text-sm font-semibold text-slate-800">Finance Overview</h3>
+              </div>
+              <div className="space-y-3">
+                <div className="flex justify-between items-center">
+                  <span className="text-xs text-slate-500">Total Pendapatan</span>
+                  <span className="text-sm font-semibold text-green-600">Rp 0</span>
+                </div>
+                <div className="flex justify-between items-center">
+                  <span className="text-xs text-slate-500">Total Pengeluaran</span>
+                  <span className="text-sm font-semibold text-red-600">Rp 0</span>
+                </div>
+                <div className="flex justify-between items-center">
+                  <span className="text-xs text-slate-500">Pending Payment</span>
+                  <span className="text-sm font-semibold text-amber-600">Rp 0</span>
+                </div>
+              </div>
+            </div>
+
             <div className="bg-white rounded-xl border border-slate-200 p-5">
               <div className="flex items-center gap-2 mb-4">
                 <Snowflake className="w-4 h-4 text-cyan-600" />
@@ -287,13 +310,16 @@ export default function DashboardPage() {
                   <span className="text-xs text-slate-500">Pending Billings</span>
                   <span className="text-sm font-semibold text-amber-600">0</span>
                 </div>
+                <div className="flex justify-between items-center">
+                  <span className="text-xs text-slate-500">Utilization</span>
+                  <span className="text-sm font-semibold text-slate-800">0%</span>
+                </div>
               </div>
             </div>
 
-            {/* Recent Activity placeholder */}
             <div className="bg-white rounded-xl border border-slate-200 p-5">
               <div className="flex items-center gap-2 mb-4">
-                <TrendingUp className="w-4 h-4 text-slate-400" />
+                <Activity className="w-4 h-4 text-slate-400" />
                 <h3 className="text-sm font-semibold text-slate-800">Aktivitas Terakhir</h3>
               </div>
               <p className="text-sm text-slate-400 text-center py-4">

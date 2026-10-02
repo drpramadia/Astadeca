@@ -8,8 +8,6 @@ import { supabase } from '@/lib/supabase/client'
 import Link from 'next/link'
 import { Plus, Search, Truck, Loader2, X, ArrowDownToLine } from 'lucide-react'
 
-const ORG_ID = '20000000-0000-0000-0000-000000000001'
-
 type DO = {
   id: string
   do_number: string
@@ -22,7 +20,7 @@ type DO = {
 }
 
 export default function DeliveryOrdersPage() {
-  const { roleCode, loaded } = useSession()
+  const { roleCode, loaded, organizationId } = useSession()
   const [data, setData] = useState<DO[]>([])
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
@@ -45,7 +43,7 @@ export default function DeliveryOrdersPage() {
     const { data: rows } = await supabase
       .from('delivery_orders')
       .select('*, customers(name)')
-      .eq('organization_id', ORG_ID)
+      .eq('organization_id', organizationId)
       .order('created_at', { ascending: false })
       .limit(100)
     setData((rows as DO[]) || [])
@@ -53,7 +51,7 @@ export default function DeliveryOrdersPage() {
   }
 
   async function loadCustomers() {
-    const { data } = await supabase.from('customers').select('id, name').eq('organization_id', ORG_ID).order('name')
+    const { data } = await supabase.from('customers').select('id, name').eq('organization_id', organizationId).order('name')
     setCustomers(data || [])
   }
 
@@ -68,7 +66,7 @@ export default function DeliveryOrdersPage() {
     const doNumber = numData as string
 
     const { error: err } = await supabase.from('delivery_orders').insert({
-      organization_id: ORG_ID,
+      organization_id: organizationId,
       do_number: doNumber,
       customer_id: fd.get('customer_id') as string || null,
       driver_name: fd.get('driver_name') as string || null,

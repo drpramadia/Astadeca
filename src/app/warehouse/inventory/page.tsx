@@ -7,8 +7,6 @@ import { useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabase/client'
 import { Search, Boxes, Loader2 } from 'lucide-react'
 
-const ORG_ID = '20000000-0000-0000-0000-000000000001'
-
 type Inv = {
   id: string
   quantity_kg: number
@@ -21,7 +19,7 @@ type Inv = {
 }
 
 export default function InventoryPage() {
-  const { roleCode, loaded } = useSession()
+  const { roleCode, loaded, organizationId } = useSession()
   const [data, setData] = useState<Inv[]>([])
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
@@ -40,7 +38,7 @@ export default function InventoryPage() {
     let q = supabase
       .from('inventory')
       .select('*, products(name, sku), cold_storages(name)')
-      .eq('organization_id', ORG_ID)
+      .eq('organization_id', organizationId)
       .order('received_at', { ascending: false })
       .limit(200)
     if (statusFilter) q = q.eq('status', statusFilter)

@@ -8,8 +8,6 @@ import { supabase } from '@/lib/supabase/client'
 import Link from 'next/link'
 import { Plus, Search, FileText, Loader2 } from 'lucide-react'
 
-const ORG_ID = '20000000-0000-0000-0000-000000000001'
-
 type Contract = {
   id: string
   contract_number: string
@@ -25,7 +23,7 @@ type Contract = {
 }
 
 export default function ContractsPage() {
-  const { roleCode, loaded } = useSession()
+  const { roleCode, loaded, organizationId } = useSession()
   const [data, setData] = useState<Contract[]>([])
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
@@ -44,7 +42,7 @@ export default function ContractsPage() {
     let q = supabase
       .from('rental_contracts')
       .select('*, rental_customers(name), cold_storages(name)')
-      .eq('organization_id', ORG_ID)
+      .eq('organization_id', organizationId)
       .order('created_at', { ascending: false })
       .limit(100)
     if (statusFilter) q = q.eq('status', statusFilter)

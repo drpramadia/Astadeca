@@ -8,15 +8,13 @@ import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { Loader2, X, Plus, Trash2 } from 'lucide-react'
 
-const ORG_ID = '20000000-0000-0000-0000-000000000001'
-
 type Supplier = { id: string; name: string }
 type Product = { id: string; name: string; sku: string; unit_id: string | null }
 
 type LineItem = { product_id: string; quantity_kg: string; price_per_kg: string }
 
 export default function NewPOPage() {
-  const { roleCode, loaded } = useSession()
+  const { roleCode, loaded, organizationId } = useSession()
   const router = useRouter()
   
   const [suppliers, setSuppliers] = useState<Supplier[]>([])
@@ -39,8 +37,8 @@ export default function NewPOPage() {
   async function loadRefs() {
     setLoadingRefs(true)
     const [sRes, pRes] = await Promise.all([
-      supabase.from('suppliers').select('id, name').eq('organization_id', ORG_ID).order('name'),
-      supabase.from('products').select('id, name, sku, unit_id').eq('organization_id', ORG_ID).eq('is_active', true).order('name'),
+      supabase.from('suppliers').select('id, name').eq('organization_id', organizationId).order('name'),
+      supabase.from('products').select('id, name, sku, unit_id').eq('organization_id', organizationId).eq('is_active', true).order('name'),
     ])
     setSuppliers(sRes.data || [])
     setProducts(pRes.data || [])
@@ -73,11 +71,11 @@ export default function NewPOPage() {
     const poNumber = numData as string
 
     const { data: po, error: poErr } = await supabase.from('purchase_orders').insert({
-      organization_id: ORG_ID,
+      organization_id: organizationId,
       supplier_id: supplierId,
       po_number: poNumber,
       notes: notes || null,
-      status: roleCode === 'DIRECTOR' ? 'APPROVED' : 'DRAFT',
+      status: roleCode === 'DIRECTOR' ? 'APPROVED' : 'PENDING_APPROVAL',
       created_by: userData.user?.id,
     }).select().single()
 
@@ -92,8 +90,25 @@ export default function NewPOPage() {
     }))
 
     const { error: lineErr } = await supabase.from('purchase_order_lines').insert(lines)
+    if (lineErr) { setError(lineErr.message); setSaving(false); return }
+
+    // Create approval request for non-director users
+    if (roleCode !== 'DIRECTOR') {
+      const { data: apprData, error: apprErr } = await supabase.from('approval_requests').insert({
+        organization_id: organizationId,
+        request_type: 'PURCHASE_ORDER',
+        reference_id: po.id,
+        status: 'PENDING',
+        requested_by: userData.user?.id,
+      }).select().single()
+      if (apprErr) { setError(apprErr.message); setSaving(false); return }
+      // Link the approval request to the PO
+      if (apprData?.id) {
+        await supabase.from('purchase_orders').update({ approval_request_id: apprData.id }).eq('id', po.id)
+      }
+    }
+
     setSaving(false)
-    if (lineErr) { setError(lineErr.message); return }
     router.push('/operational/purchase-orders')
   }
 

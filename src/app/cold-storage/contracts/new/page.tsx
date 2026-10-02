@@ -9,8 +9,6 @@ import { useRouter } from 'next/navigation'
 import { Loader2, X, Plus } from 'lucide-react'
 import { useForm, useFieldArray } from 'react-hook-form'
 
-const ORG_ID = '20000000-0000-0000-0000-000000000001'
-
 type Customer = { id: string; name: string }
 type ColdStorage = { id: string; name: string }
 type Rate = { id: string; price_per_kg_per_day: number }
@@ -27,7 +25,7 @@ interface ContractFormData {
 }
 
 export default function NewContractPage() {
-  const { roleCode, loaded } = useSession()
+  const { roleCode, loaded, organizationId } = useSession()
   const router = useRouter()
   
   const [customers, setCustomers] = useState<Customer[]>([])
@@ -52,8 +50,8 @@ export default function NewContractPage() {
   async function loadRefs() {
     setLoadingRefs(true)
     const [cRes, csRes] = await Promise.all([
-      supabase.from('rental_customers').select('id, name').eq('organization_id', ORG_ID).order('name'),
-      supabase.from('cold_storages').select('id, name').eq('organization_id', ORG_ID).order('name'),
+      supabase.from('rental_customers').select('id, name').eq('organization_id', organizationId).order('name'),
+      supabase.from('cold_storages').select('id, name').eq('organization_id', organizationId).order('name'),
     ])
     setCustomers(cRes.data || [])
     setColdStorages(csRes.data || [])
@@ -70,7 +68,7 @@ export default function NewContractPage() {
     const contractNumber = numData as string
 
     const { data: inserted, error: insErr } = await supabase.from('rental_contracts').insert({
-      organization_id: ORG_ID,
+      organization_id: organizationId,
       customer_id: form.customer_id,
       cold_storage_id: form.cold_storage_id || null,
       contract_number: contractNumber,
@@ -79,12 +77,28 @@ export default function NewContractPage() {
       price_per_kg_per_day: parseFloat(form.price_per_kg_per_day) || 0,
       total_estimated_kg: parseFloat(form.total_estimated_kg) || 0,
       notes: form.notes || null,
-      status: roleCode === 'DIRECTOR' ? 'ACTIVE' : 'DRAFT',
+      status: roleCode === 'DIRECTOR' ? 'ACTIVE' : 'PENDING_APPROVAL',
       created_by: userData.user?.id,
     }).select().single()
 
+    if (insErr) { setError(insErr.message); setSaving(false); return }
+
+    // Create approval request for non-director users
+    if (roleCode !== 'DIRECTOR') {
+      const { data: apprData, error: apprErr } = await supabase.from('approval_requests').insert({
+        organization_id: organizationId,
+        request_type: 'CONTRACT',
+        reference_id: inserted.id,
+        status: 'PENDING',
+        requested_by: userData.user?.id,
+      }).select().single()
+      if (apprErr) { setError(apprErr.message); setSaving(false); return }
+      if (apprData?.id) {
+        await supabase.from('rental_contracts').update({ approval_request_id: apprData.id }).eq('id', inserted.id)
+      }
+    }
+
     setSaving(false)
-    if (insErr) { setError(insErr.message); return }
     router.push('/cold-storage/contracts')
   }
 

@@ -6,8 +6,6 @@ import { useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabase/client'
 import { Search, ArrowUpFromLine, Loader2, Package } from 'lucide-react'
 
-const ORG_ID = '20000000-0000-0000-0000-000000000001'
-
 type Issue = {
   id: string
   movement_type: string
@@ -27,7 +25,7 @@ const TYPE_COLORS: Record<string, string> = {
 }
 
 export default function GoodsIssuesPage() {
-  const { loaded } = useSession()
+  const { loaded, organizationId } = useSession()
   const [data, setData] = useState<Issue[]>([])
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
@@ -43,7 +41,7 @@ export default function GoodsIssuesPage() {
     const { data: rows } = await supabase
       .from('inventory_movements')
       .select('*, products(name, sku), profiles(full_name)')
-      .eq('organization_id', ORG_ID)
+      .eq('organization_id', organizationId)
       .eq('movement_type', 'OUT')
       .order('performed_at', { ascending: false })
       .limit(100)
@@ -66,7 +64,7 @@ export default function GoodsIssuesPage() {
         <div className="flex items-start justify-between mb-6">
           <div>
             <h1 className="text-2xl font-bold text-slate-800 font-display">Pengeluaran Barang</h1>
-            <p className="mt-1 text-sm text-slate-500">Goods Issue â€” pelepasan stok barang</p>
+            <p className="mt-1 text-sm text-slate-500">Goods Issue — pelepasan stok barang</p>
           </div>
         </div>
 

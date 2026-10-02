@@ -8,15 +8,13 @@ import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { Loader2, X, Plus, Trash2 } from 'lucide-react'
 
-const ORG_ID = '20000000-0000-0000-0000-000000000001'
-
 type Customer = { id: string; name: string }
 type Product = { id: string; name: string; sku: string }
 
 type LineItem = { product_id: string; quantity_kg: string; price_per_kg: string }
 
 export default function NewSOPage() {
-  const { roleCode, loaded } = useSession()
+  const { roleCode, loaded, organizationId } = useSession()
   const router = useRouter()
   
   const [customers, setCustomers] = useState<Customer[]>([])
@@ -39,8 +37,8 @@ export default function NewSOPage() {
   async function loadRefs() {
     setLoadingRefs(true)
     const [cRes, pRes] = await Promise.all([
-      supabase.from('customers').select('id, name').eq('organization_id', ORG_ID).order('name'),
-      supabase.from('products').select('id, name, sku').eq('organization_id', ORG_ID).eq('is_active', true).order('name'),
+      supabase.from('customers').select('id, name').eq('organization_id', organizationId).order('name'),
+      supabase.from('products').select('id, name, sku').eq('organization_id', organizationId).eq('is_active', true).order('name'),
     ])
     setCustomers(cRes.data || [])
     setProducts(pRes.data || [])
@@ -64,11 +62,11 @@ export default function NewSOPage() {
     const soNumber = numData as string
 
     const { data: so, error: soErr } = await supabase.from('sales_orders').insert({
-      organization_id: ORG_ID,
+      organization_id: organizationId,
       customer_id: customerId,
       so_number: soNumber,
       notes: notes || null,
-      status: roleCode === 'DIRECTOR' ? 'APPROVED' : 'DRAFT',
+      status: roleCode === 'DIRECTOR' ? 'APPROVED' : 'PENDING_APPROVAL',
       created_by: userData.user?.id,
     }).select().single()
 
@@ -82,7 +80,24 @@ export default function NewSOPage() {
       subtotal: parseFloat(item.quantity_kg) * parseFloat(item.price_per_kg),
     }))
 
-    await supabase.from('sales_order_lines').insert(lines)
+    const { error: lineErr } = await supabase.from('sales_order_lines').insert(lines)
+    if (lineErr) { setError(lineErr.message); setSaving(false); return }
+
+    // Create approval request for non-director users
+    if (roleCode !== 'DIRECTOR') {
+      const { data: apprData, error: apprErr } = await supabase.from('approval_requests').insert({
+        organization_id: organizationId,
+        request_type: 'SALES_ORDER',
+        reference_id: so.id,
+        status: 'PENDING',
+        requested_by: userData.user?.id,
+      }).select().single()
+      if (apprErr) { setError(apprErr.message); setSaving(false); return }
+      if (apprData?.id) {
+        await supabase.from('sales_orders').update({ approval_request_id: apprData.id }).eq('id', so.id)
+      }
+    }
+
     setSaving(false)
     router.push('/operational/sales-orders')
   }

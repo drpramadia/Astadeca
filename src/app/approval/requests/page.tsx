@@ -7,11 +7,10 @@ import { useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabase/client'
 import { ClipboardCheck, Loader2, Check, X, FileText } from 'lucide-react'
 
-const ORG_ID = '20000000-0000-0000-0000-000000000001'
-
 type Approval = {
   id: string
   request_type: string
+  reference_id: string
   status: string
   comment: string | null
   created_at: string
@@ -26,7 +25,7 @@ const TYPE_LABELS: Record<string, string> = {
 }
 
 export default function ApprovalPage() {
-  const { roleCode, loaded } = useSession()
+  const { roleCode, loaded, organizationId } = useSession()
   const [data, setData] = useState<Approval[]>([])
   const [loading, setLoading] = useState(true)
   const [processing, setProcessing] = useState<string | null>(null)
@@ -44,7 +43,7 @@ export default function ApprovalPage() {
     const { data: rows } = await supabase
       .from('approval_requests')
       .select('*, profiles!approval_requests_requested_by_fkey(full_name)')
-      .eq('organization_id', ORG_ID)
+      .eq('organization_id', organizationId)
       .order('created_at', { ascending: false })
       .limit(100)
     setData((rows as Approval[]) || [])
@@ -55,11 +54,42 @@ export default function ApprovalPage() {
     if (!confirm(`Yakin ingin ${decision === 'APPROVED' ? 'menyetujui' : 'menolak'} request ini?`)) return
     setProcessing(id)
     const { data: userData } = await supabase.auth.getUser()
+    const row = data.find((r) => r.id === id)
+    const newStatus = decision === 'APPROVED' ? 'APPROVED' : 'REJECTED'
+
     const { error } = await supabase.from('approval_requests').update({
       status: decision,
       decided_by: userData.user?.id,
       decided_at: new Date().toISOString(),
     }).eq('id', id)
+
+    if (!error && row) {
+      // Update the referenced document status
+      const refId = row.reference_id
+      const refType = row.request_type
+      if (decision === 'APPROVED') {
+        if (refType === 'PURCHASE_ORDER') {
+          await supabase.from('purchase_orders').update({ status: 'APPROVED' }).eq('id', refId)
+        } else if (refType === 'SALES_ORDER') {
+          await supabase.from('sales_orders').update({ status: 'APPROVED' }).eq('id', refId)
+        } else if (refType === 'CONTRACT') {
+          await supabase.from('rental_contracts').update({ status: 'ACTIVE' }).eq('id', refId)
+        } else if (refType === 'DELIVERY') {
+          await supabase.from('delivery_requests').update({ status: 'APPROVED' }).eq('id', refId)
+        }
+      } else if (decision === 'REJECTED') {
+        if (refType === 'PURCHASE_ORDER') {
+          await supabase.from('purchase_orders').update({ status: 'REJECTED' }).eq('id', refId)
+        } else if (refType === 'SALES_ORDER') {
+          await supabase.from('sales_orders').update({ status: 'REJECTED' }).eq('id', refId)
+        } else if (refType === 'CONTRACT') {
+          await supabase.from('rental_contracts').update({ status: 'CANCELLED' }).eq('id', refId)
+        } else if (refType === 'DELIVERY') {
+          await supabase.from('delivery_requests').update({ status: 'REJECTED' }).eq('id', refId)
+        }
+      }
+    }
+
     setProcessing(null)
     if (!error) fetchData()
   }

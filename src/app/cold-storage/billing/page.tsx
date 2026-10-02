@@ -7,8 +7,6 @@ import { useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabase/client'
 import { Search, DollarSign, Loader2 } from 'lucide-react'
 
-const ORG_ID = '20000000-0000-0000-0000-000000000001'
-
 type Billing = {
   id: string
   invoice_number: string
@@ -22,7 +20,7 @@ type Billing = {
 }
 
 export default function BillingPage() {
-  const { roleName, loaded } = useSession()
+  const { roleName, loaded, organizationId } = useSession()
   const [data, setData] = useState<Billing[]>([])
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
@@ -37,7 +35,7 @@ export default function BillingPage() {
     const { data: rows } = await supabase
       .from('rental_billing')
       .select('*, rental_contracts(contract_number), rental_contracts(rental_customers(name))')
-      .eq('organization_id', ORG_ID)
+      .eq('organization_id', organizationId)
       .order('created_at', { ascending: false })
       .limit(100)
     setData((rows as Billing[]) || [])

@@ -23,11 +23,13 @@ import {
   ArrowUpFromLine,
   Boxes,
   ChevronLeft,
+  BarChart3,
+  Bell,
+  FolderOpen,
+  CreditCard,
 } from 'lucide-react'
 import { useSession } from '@/hooks/use-session'
 import LogoutButton from '@/components/logout-button'
-
-// ─── Types ───────────────────────────────────────────────────────────────────
 
 type NavItem = {
   label: string
@@ -41,16 +43,13 @@ type NavGroup = {
   items: NavItem[]
 }
 
-// ─── Navigation Config ───────────────────────────────────────────────────────
+const DASHBOARD_ITEM: NavItem = {
+  label: 'Dashboard',
+  href: '/dashboard',
+  icon: LayoutDashboard,
+}
 
 const NAV_GROUPS: NavGroup[] = [
-  {
-    label: 'Ringkasan',
-    icon: LayoutDashboard,
-    items: [
-      { label: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
-    ],
-  },
   {
     label: 'Cold Storage',
     icon: Snowflake,
@@ -81,6 +80,15 @@ const NAV_GROUPS: NavGroup[] = [
     ],
   },
   {
+    label: 'Keuangan',
+    icon: BarChart3,
+    items: [
+      { label: 'Transaksi', href: '/finance/transactions', icon: DollarSign },
+      { label: 'Laporan', href: '/finance/reports', icon: BarChart3 },
+      { label: 'Payments', href: '/finance/payments', icon: CreditCard },
+    ],
+  },
+  {
     label: 'Approval',
     icon: ClipboardCheck,
     items: [
@@ -95,6 +103,20 @@ const NAV_GROUPS: NavGroup[] = [
     ],
   },
   {
+    label: 'Dokumen',
+    icon: FolderOpen,
+    items: [
+      { label: 'Dokumen', href: '/documents', icon: FileText },
+    ],
+  },
+  {
+    label: 'Notifikasi',
+    icon: Bell,
+    items: [
+      { label: 'Notifikasi', href: '/notifications', icon: Bell },
+    ],
+  },
+  {
     label: 'Administrasi',
     icon: ShieldCheck,
     items: [
@@ -104,25 +126,22 @@ const NAV_GROUPS: NavGroup[] = [
   },
 ]
 
-// ─── Role → visible groups ───────────────────────────────────────────────────
+function getVisibleGroups(roleCode: string | null): (NavGroup | NavItem)[] {
+  const visibleGroups = NAV_GROUPS.filter((g) => {
+    if (roleCode === 'SYSTEM_ADMIN') return true
+    if (roleCode === 'WAREHOUSE') {
+      return ['Cold Storage', 'Warehouse', 'Dokumen', 'Notifikasi'].includes(g.label)
+    }
+    if (roleCode === 'ADMIN') {
+      return !['Approval', 'Administrasi'].includes(g.label)
+    }
+    // DIRECTOR or unknown
+    return g.label !== 'Administrasi' && g.label !== 'Notifikasi'
+  })
 
-function getVisibleGroups(roleCode: string | null): NavGroup[] {
-  if (roleCode === 'SYSTEM_ADMIN') {
-    return NAV_GROUPS
-  }
-  if (roleCode === 'WAREHOUSE') {
-    return NAV_GROUPS.filter((g) =>
-      ['Ringkasan', 'Warehouse'].includes(g.label)
-    )
-  }
-  if (roleCode === 'ADMIN') {
-    return NAV_GROUPS.filter((g) => !['Approval', 'Administrasi'].includes(g.label))
-  }
-  // DIRECTOR or unknown: everything except platform administration
-  return NAV_GROUPS.filter((g) => g.label !== 'Administrasi')
+  // Dashboard is always first, as a top-level item (not in a group)
+  return [DASHBOARD_ITEM, ...visibleGroups]
 }
-
-// ─── Sidebar nav item ─────────────────────────────────────────────────────────
 
 function NavLink({ item, isActive }: { item: NavItem; isActive: boolean }) {
   const Icon = item.icon
@@ -140,8 +159,6 @@ function NavLink({ item, isActive }: { item: NavItem; isActive: boolean }) {
     </Link>
   )
 }
-
-// ─── Collapsible group ───────────────────────────────────────────────────────
 
 function NavGroupRow({
   group,
@@ -187,14 +204,13 @@ function NavGroupRow({
   )
 }
 
-// ─── App Shell ───────────────────────────────────────────────────────────────
-
 export default function AppShell({ children }: { children: React.ReactNode }) {
-  const { name, roleName, roleCode, loaded, userId } = useSession()
+  const { roleCode, loaded, userId } = useSession()
   const pathname = usePathname()
   const router = useRouter()
   const [sidebarOpen, setSidebarOpen] = useState(false)
-  const [collapsed, setCollapsed] = useState(false)
+  const [hovered, setHovered] = useState(false)
+  const expanded = hovered
 
   useEffect(() => {
     if (loaded && !userId) {
@@ -202,18 +218,20 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
     }
   }, [loaded, userId, router])
 
-  const visibleGroups = getVisibleGroups(roleCode)
+  const visibleNav = getVisibleGroups(roleCode)
+
   const [openGroups, setOpenGroups] = useState<Set<string>>(() => {
-    // Auto-open groups that contain the active route
     const initial = new Set<string>()
-    visibleGroups.forEach((g) => {
-      if (g.items.some((item) => pathname.startsWith(item.href))) {
-        initial.add(g.label)
+    visibleNav.forEach((item) => {
+      if ('items' in item) {
+        if (item.items.some((i) => pathname.startsWith(i.href))) {
+          initial.add(item.label)
+        }
       }
     })
-    // Always open first group if nothing is active
-    if (initial.size === 0 && visibleGroups.length > 0) {
-      initial.add(visibleGroups[0].label)
+    if (initial.size === 0 && visibleNav.length > 0) {
+      const firstGroup = visibleNav.find((g) => 'items' in g)
+      if (firstGroup) initial.add(firstGroup.label)
     }
     return initial
   })
@@ -230,22 +248,8 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
     })
   }
 
-  function getRoleBadgeClass(role: string | null) {
-    switch (role?.toUpperCase()) {
-      case 'DIRECTOR':
-        return 'bg-amber-500/20 text-amber-400 border-amber-500/30'
-      case 'ADMIN':
-        return 'bg-cyan-500/20 text-cyan-400 border-cyan-500/30'
-      case 'WAREHOUSE':
-        return 'bg-green-500/20 text-green-400 border-green-500/30'
-      default:
-        return 'bg-white/10 text-white/60 border-white/20'
-    }
-  }
-
   return (
     <div className="flex h-screen overflow-hidden" style={{ backgroundColor: '#f8fafc' }}>
-      {/* Mobile overlay */}
       {sidebarOpen && (
         <div
           className="fixed inset-0 z-20 bg-black/50 lg:hidden"
@@ -253,26 +257,25 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
         />
       )}
 
-      {/* Sidebar */}
       <aside
         className={`
           fixed inset-y-0 left-0 z-30 flex flex-col
-          transition-transform duration-300 ease-in-out
+          transition-all duration-300 ease-in-out
           lg:relative lg:translate-x-0 lg:flex-shrink-0
           ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'}
-          ${collapsed ? 'lg:w-[68px]' : 'w-[286px]'}
+          ${expanded ? 'w-[286px]' : 'w-[68px]'}
         `}
         style={{ backgroundColor: '#1a2a32' }}
+        onMouseEnter={() => setHovered(true)}
+        onMouseLeave={() => setHovered(false)}
       >
         {/* Brand header */}
         <div className="flex items-center gap-3 px-5 h-16 border-b border-white/10 flex-shrink-0">
-          <div
-            className="flex items-center justify-center w-9 h-9 rounded-lg flex-shrink-0 bg-white/95 p-1"
-          >
+          <div className="flex items-center justify-center w-9 h-9 rounded-lg flex-shrink-0">
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img src="/logo/astadeca.png" alt="Astadeca Baswara Persada" className="w-full h-full object-contain" />
           </div>
-          {!collapsed && (
+          {expanded && (
             <div className="overflow-hidden">
               <p className="text-white font-bold text-sm leading-tight truncate font-display">
                 Astadeca Baswara Persada
@@ -283,53 +286,30 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
             </div>
           )}
           <button
-            onClick={() => setCollapsed(!collapsed)}
+            onClick={() => setHovered(!hovered)}
             className="ml-auto hidden lg:flex items-center justify-center w-7 h-7 rounded-md text-white/40 hover:text-white hover:bg-white/10 transition-colors"
-            aria-label={collapsed ? 'Buka sidebar' : 'Tutup sidebar'}
+            aria-label={expanded ? 'Tutup sidebar' : 'Buka sidebar'}
           >
-            <ChevronLeft className={`w-4 h-4 transition-transform ${collapsed ? 'rotate-180' : ''}`} />
+            <ChevronLeft className={`w-4 h-4 transition-transform ${expanded ? 'rotate-0' : 'rotate-180'}`} />
           </button>
         </div>
 
-        {/* User info */}
-        {loaded && (
-          <div className="px-4 py-4 border-b border-white/10 flex-shrink-0">
-            <div className="flex items-center gap-3">
-              <div className="w-9 h-9 rounded-full flex items-center justify-center flex-shrink-0 text-sm font-bold text-white bg-cyan-500/30 border border-cyan-500/30">
-                {(name ?? 'U')
-                  .split(' ')
-                  .map((n) => n[0])
-                  .slice(0, 2)
-                  .join('')
-                  .toUpperCase()}
-              </div>
-              {!collapsed && (
-                <div className="min-w-0 flex-1">
-                  <p className="text-white text-sm font-medium truncate">{name ?? 'User'}</p>
-                  <span
-                    className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium border ${getRoleBadgeClass(
-                      roleName
-                    )}`}
-                  >
-                    {roleName ?? 'Guest'}
-                  </span>
-                </div>
-              )}
-            </div>
-          </div>
-        )}
-
         {/* Nav groups */}
         <nav className="flex-1 overflow-y-auto py-4 px-3 space-y-1">
-          {visibleGroups.map((group) => (
-            <NavGroupRow
-              key={group.label}
-              group={group}
-              isOpen={openGroups.has(group.label)}
-              onToggle={() => toggleGroup(group.label)}
-              activeItem={pathname}
-            />
-          ))}
+          {visibleNav.map((item) => {
+            if ('items' in item) {
+              return (
+                <NavGroupRow
+                  key={item.label}
+                  group={item}
+                  isOpen={openGroups.has(item.label)}
+                  onToggle={() => toggleGroup(item.label)}
+                  activeItem={pathname}
+                />
+              )
+            }
+            return <NavLink key={item.href} item={item} isActive={pathname === item.href} />
+          })}
         </nav>
 
         {/* Mobile close button */}
@@ -344,7 +324,6 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
         </div>
       </aside>
 
-      {/* Main content */}
       <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
         {/* Top bar (mobile) */}
         <header className="flex items-center h-14 px-4 border-b border-slate-200 bg-white flex-shrink-0 lg:hidden">
@@ -364,15 +343,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
 
         {/* Top bar (desktop) */}
         <header className="hidden lg:flex items-center justify-end h-16 px-8 border-b border-slate-200 bg-white flex-shrink-0">
-          <div className="flex items-center gap-3">
-            {loaded && (
-              <div className="text-right leading-tight">
-                <p className="text-sm font-medium text-slate-700">{name ?? 'User'}</p>
-                <p className="text-xs text-slate-400">{roleName ?? 'Guest'}</p>
-              </div>
-            )}
-            <LogoutButton />
-          </div>
+          <LogoutButton />
         </header>
 
         {/* Page content */}

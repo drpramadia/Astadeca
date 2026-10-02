@@ -6,8 +6,6 @@ import { useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabase/client'
 import { Search, ArrowDownToLine, Loader2, Package } from 'lucide-react'
 
-const ORG_ID = '20000000-0000-0000-0000-000000000001'
-
 type GR = {
   id: string
   gr_number: string
@@ -18,7 +16,7 @@ type GR = {
 }
 
 export default function GoodsReceiptsPage() {
-  const { roleName, loaded } = useSession()
+  const { roleName, loaded, organizationId } = useSession()
   const [data, setData] = useState<GR[]>([])
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
@@ -34,7 +32,7 @@ export default function GoodsReceiptsPage() {
     const { data: rows } = await supabase
       .from('goods_receipts')
       .select('*, purchase_orders(po_number), profiles(full_name)')
-      .eq('organization_id', ORG_ID)
+      .eq('organization_id', organizationId)
       .order('received_at', { ascending: false })
       .limit(100)
     setData((rows as GR[]) || [])
@@ -55,7 +53,7 @@ export default function GoodsReceiptsPage() {
         <div className="flex items-start justify-between mb-6">
           <div>
             <h1 className="text-2xl font-bold text-slate-800 font-display">Penerimaan Barang</h1>
-            <p className="mt-1 text-sm text-slate-500">Goods Receipt â€” barang masuk dari supplier</p>
+            <p className="mt-1 text-sm text-slate-500">Goods Receipt — barang masuk dari supplier</p>
           </div>
         </div>
 

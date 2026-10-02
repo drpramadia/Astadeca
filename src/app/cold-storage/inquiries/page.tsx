@@ -8,8 +8,6 @@ import { supabase } from '@/lib/supabase/client'
 import Link from 'next/link'
 import { Plus, Search, FileText, Loader2 } from 'lucide-react'
 
-const ORG_ID = '20000000-0000-0000-0000-000000000001'
-
 type Inquiry = {
   id: string
   status: string
@@ -23,7 +21,7 @@ type Inquiry = {
 }
 
 export default function InquiryPage() {
-  const { roleCode, loaded } = useSession()
+  const { roleCode, loaded, organizationId } = useSession()
   const [data, setData] = useState<Inquiry[]>([])
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
@@ -42,7 +40,7 @@ export default function InquiryPage() {
     const { data: rows } = await supabase
       .from('rental_inquiries')
       .select('*, rental_customers(name), cold_storages(name)')
-      .eq('organization_id', ORG_ID)
+      .eq('organization_id', organizationId)
       .order('created_at', { ascending: false })
       .limit(50)
     setData((rows as Inquiry[]) || [])

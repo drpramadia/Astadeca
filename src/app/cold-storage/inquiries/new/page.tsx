@@ -9,13 +9,11 @@ import { useRouter } from 'next/navigation'
 import { Plus, Search, FileText, ArrowRight, Loader2, X } from 'lucide-react'
 import { useForm } from 'react-hook-form'
 
-const ORG_ID = '20000000-0000-0000-0000-000000000001'
-
 type Customer = { id: string; name: string }
 type ColdStorage = { id: string; name: string }
 
 export default function NewInquiryPage() {
-  const { roleCode, loaded } = useSession()
+  const { roleCode, loaded, organizationId } = useSession()
   const router = useRouter()
   
   const [customers, setCustomers] = useState<Customer[]>([])
@@ -37,8 +35,8 @@ export default function NewInquiryPage() {
   async function loadRefs() {
     setLoadingRefs(true)
     const [cRes, csRes] = await Promise.all([
-      supabase.from('rental_customers').select('id, name').eq('organization_id', ORG_ID).order('name'),
-      supabase.from('cold_storages').select('id, name').eq('organization_id', ORG_ID).order('name'),
+      supabase.from('rental_customers').select('id, name').eq('organization_id', organizationId).order('name'),
+      supabase.from('cold_storages').select('id, name').eq('organization_id', organizationId).order('name'),
     ])
     setCustomers(cRes.data || [])
     setColdStorages(csRes.data || [])
@@ -50,7 +48,7 @@ export default function NewInquiryPage() {
     setError(null)
     const { data: userData } = await supabase.auth.getUser()
     const { error: err } = await supabase.from('rental_inquiries').insert({
-      organization_id: ORG_ID,
+      organization_id: organizationId,
       customer_id: form.customer_id || null,
       cold_storage_id: form.cold_storage_id || null,
       requested_kg: parseFloat(form.requested_kg) || 0,

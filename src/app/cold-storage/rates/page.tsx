@@ -8,8 +8,6 @@ import { supabase } from '@/lib/supabase/client'
 import Link from 'next/link'
 import { Plus, DollarSign, Loader2, Pencil, Trash2 } from 'lucide-react'
 
-const ORG_ID = '20000000-0000-0000-0000-000000000001'
-
 type Rate = {
   id: string
   price_per_kg_per_day: number
@@ -21,7 +19,7 @@ type Rate = {
 }
 
 export default function RatesPage() {
-  const { roleCode, loaded } = useSession()
+  const { roleCode, loaded, organizationId } = useSession()
   const [data, setData] = useState<Rate[]>([])
   const [loading, setLoading] = useState(true)
   const [showForm, setShowForm] = useState(false)
@@ -45,7 +43,7 @@ export default function RatesPage() {
     const { data: rows } = await supabase
       .from('rental_rates')
       .select('*, cold_storages(name)')
-      .eq('organization_id', ORG_ID)
+      .eq('organization_id', organizationId)
       .order('created_at', { ascending: false })
       .limit(100)
     setData((rows as Rate[]) || [])
@@ -53,7 +51,7 @@ export default function RatesPage() {
   }
 
   async function loadColdStorages() {
-    const { data } = await supabase.from('cold_storages').select('id, name').eq('organization_id', ORG_ID).order('name')
+    const { data } = await supabase.from('cold_storages').select('id, name').eq('organization_id', organizationId).order('name')
     setColdStorages(data || [])
   }
 
@@ -62,7 +60,7 @@ export default function RatesPage() {
     setSaving(true)
     setError(null)
     const payload = {
-      organization_id: ORG_ID,
+      organization_id: organizationId,
       cold_storage_id: formData.cold_storage_id || null,
       price_per_kg_per_day: parseFloat(formData.price_per_kg_per_day) || 0,
       minimum_days: parseInt(formData.minimum_days) || 1,

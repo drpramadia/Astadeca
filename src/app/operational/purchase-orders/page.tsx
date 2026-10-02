@@ -8,8 +8,6 @@ import { supabase } from '@/lib/supabase/client'
 import Link from 'next/link'
 import { Plus, Search, ShoppingCart, Loader2 } from 'lucide-react'
 
-const ORG_ID = '20000000-0000-0000-0000-000000000001'
-
 type PO = {
   id: string
   po_number: string
@@ -21,7 +19,7 @@ type PO = {
 }
 
 export default function PurchaseOrdersPage() {
-  const { roleCode, loaded } = useSession()
+  const { roleCode, loaded, organizationId } = useSession()
   const [data, setData] = useState<PO[]>([])
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
@@ -40,7 +38,7 @@ export default function PurchaseOrdersPage() {
     let q = supabase
       .from('purchase_orders')
       .select('*, suppliers(name), profiles(full_name)')
-      .eq('organization_id', ORG_ID)
+      .eq('organization_id', organizationId)
       .order('created_at', { ascending: false })
       .limit(100)
     if (statusFilter) q = q.eq('status', statusFilter)
