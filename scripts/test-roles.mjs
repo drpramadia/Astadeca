@@ -8,16 +8,20 @@ const NAV_GROUPS = [
   { label: 'Warehouse' },
   { label: 'Approval' },
   { label: 'Data Master' },
+  { label: 'Administrasi' },
 ]
 
 function visibleGroups(roleCode) {
+  if (roleCode === 'SYSTEM_ADMIN') {
+    return NAV_GROUPS
+  }
   if (roleCode === 'WAREHOUSE') {
     return NAV_GROUPS.filter((g) => ['Ringkasan', 'Warehouse'].includes(g.label))
   }
   if (roleCode === 'ADMIN') {
-    return NAV_GROUPS.filter((g) => g.label !== 'Approval')
+    return NAV_GROUPS.filter((g) => !['Approval', 'Administrasi'].includes(g.label))
   }
-  return NAV_GROUPS
+  return NAV_GROUPS.filter((g) => g.label !== 'Administrasi')
 }
 
 // Access predicates as written in the pages
@@ -26,21 +30,26 @@ const can = (roleCode) => ({
   approvalApprove: roleCode === 'DIRECTOR',
   operational: roleCode === 'DIRECTOR' || roleCode === 'ADMIN',
   warehouseInventory: roleCode === 'WAREHOUSE',
+  systemAdmin: roleCode === 'SYSTEM_ADMIN',
 })
 
-const roles = ['DIRECTOR', 'ADMIN', 'WAREHOUSE']
+const roles = ['SYSTEM_ADMIN', 'DIRECTOR', 'ADMIN', 'WAREHOUSE']
 const expected = {
+  SYSTEM_ADMIN: {
+    groups: ['Ringkasan', 'Cold Storage', 'Operasional', 'Warehouse', 'Approval', 'Data Master', 'Administrasi'],
+    coldStorage: false, approvalApprove: false, operational: false, warehouseInventory: false, systemAdmin: true,
+  },
   DIRECTOR: {
     groups: ['Ringkasan', 'Cold Storage', 'Operasional', 'Warehouse', 'Approval', 'Data Master'],
-    coldStorage: true, approvalApprove: true, operational: true, warehouseInventory: false,
+    coldStorage: true, approvalApprove: true, operational: true, warehouseInventory: false, systemAdmin: false,
   },
   ADMIN: {
     groups: ['Ringkasan', 'Cold Storage', 'Operasional', 'Warehouse', 'Data Master'],
-    coldStorage: true, approvalApprove: false, operational: true, warehouseInventory: false,
+    coldStorage: true, approvalApprove: false, operational: true, warehouseInventory: false, systemAdmin: false,
   },
   WAREHOUSE: {
     groups: ['Ringkasan', 'Warehouse'],
-    coldStorage: false, approvalApprove: false, operational: false, warehouseInventory: true,
+    coldStorage: false, approvalApprove: false, operational: false, warehouseInventory: true, systemAdmin: false,
   },
 }
 
@@ -59,6 +68,7 @@ for (const role of roles) {
   check(role, 'approval approve', c.approvalApprove, e.approvalApprove)
   check(role, 'operational access', c.operational, e.operational)
   check(role, 'warehouse inventory', c.warehouseInventory, e.warehouseInventory)
+  check(role, 'system admin', c.systemAdmin, e.systemAdmin)
   console.log('')
 }
 

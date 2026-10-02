@@ -3,7 +3,7 @@
 import { useState, FormEvent } from 'react'
 import { useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabase/client'
-import { Snowflake, Eye, EyeOff, AlertCircle, Loader2 } from 'lucide-react'
+import { Eye, EyeOff, AlertCircle, Loader2 } from 'lucide-react'
 
 export default function LoginPage() {
   const router = useRouter()
@@ -106,11 +106,12 @@ export default function LoginPage() {
         <div className="bg-white/5 backdrop-blur-md border border-white/10 rounded-2xl shadow-2xl overflow-hidden">
           {/* Header */}
           <div className="px-8 pt-10 pb-6 text-center border-b border-white/5">
-            <div className="inline-flex items-center justify-center w-14 h-14 rounded-xl mb-4" style={{ background: 'linear-gradient(135deg, #086b76 0%, #0ea5e9 100%)' }}>
-              <Snowflake className="w-7 h-7 text-white" />
+            <div className="inline-flex items-center justify-center w-16 h-16 rounded-xl mb-4 bg-white/95 p-2">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src="/logo/astadeca.png" alt="Astadeca Baswara Persada" className="w-full h-full object-contain" />
             </div>
-            <h1 className="text-2xl font-bold text-white font-display tracking-tight">
-              ASTADECA
+            <h1 className="text-xl font-bold text-white font-display tracking-tight leading-snug">
+              Astadeca Baswara Persada
             </h1>
             <p className="mt-1 text-sm text-white/50">
               Sistem ERP Cold Storage &amp; Operasional
@@ -205,7 +206,7 @@ export default function LoginPage() {
           {/* Footer */}
           <div className="px-8 pb-6 text-center">
             <p className="text-xs text-white/30">
-              &copy; {new Date().getFullYear()} PT Astadeca. Hak cipta dilindungi.
+              &copy; {new Date().getFullYear()} PT Astadeca Baswara Persada. Hak cipta dilindungi.
             </p>
           </div>
         </div>

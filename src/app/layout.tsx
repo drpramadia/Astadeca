@@ -17,8 +17,13 @@ const pjsDisplay = Plus_Jakarta_Sans({
 })
 
 export const metadata: Metadata = {
-  title: 'ERP Astadeca',
+  title: 'Astadeca Baswara Persada — ERP',
   description: 'Sistem ERP untuk Cold Storage & Operasional',
+  icons: {
+    icon: '/logo/astadeca.png',
+    shortcut: '/logo/astadeca.png',
+    apple: '/logo/astadeca.png',
+  },
 }
 
 export default function RootLayout({

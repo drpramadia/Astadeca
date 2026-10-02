@@ -10,10 +10,13 @@ interface SessionContextValue {
   isDirector: boolean
   isAdmin: boolean
   isWarehouse: boolean
+  isSystemAdmin: boolean
   roleCode: string | null
   roleName: string | null
   name: string | null
   email: string | null
+  username: string | null
+  organizationId: string | null
   organizationName: string | null
 }
 
@@ -24,14 +27,15 @@ const SessionContext = createContext<SessionContextValue>({
   isDirector: false,
   isAdmin: false,
   isWarehouse: false,
+  isSystemAdmin: false,
   roleCode: null,
   roleName: null,
   name: null,
   email: null,
+  username: null,
+  organizationId: null,
   organizationName: null,
 })
-
-const ORG_ID = '20000000-0000-0000-0000-000000000001'
 
 export function SessionProvider({ children }: { children: React.ReactNode }) {
   const [value, setValue] = useState<SessionContextValue>({
@@ -41,10 +45,13 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
     isDirector: false,
     isAdmin: false,
     isWarehouse: false,
+    isSystemAdmin: false,
     roleCode: null,
     roleName: null,
     name: null,
     email: null,
+    username: null,
+    organizationId: null,
     organizationName: null,
   })
 
@@ -58,40 +65,38 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
         }
 
         const user = session.user
-        const userId = user.id ?? null
 
-        const { data: profile } = await supabase
-          .from('profiles')
-          .select('id, name, email, organization_id')
-          .eq('id', userId)
-          .single()
+        const { data, error } = await supabase.rpc('get_my_session')
+        if (error || !data?.authenticated) {
+          const userId = user.id ?? null
+          setValue((prev) => ({
+            ...prev,
+            userId,
+            loaded: true,
+            name: user.user_metadata?.full_name ?? user.email ?? null,
+            email: user.email ?? null,
+          }))
+          return
+        }
 
-        const { data: membership } = await supabase
-          .from('organization_memberships')
-          .select('role_id, roles(code, name, permissions:role_permissions(permission_code))')
-          .eq('user_id', userId)
-          .eq('organization_id', ORG_ID)
-          .single()
-
-        const roleObj = Array.isArray(membership) ? membership[0] : membership
-        const roleCode = roleObj?.roles?.code ?? null
-        const roleName = roleObj?.roles?.name ?? null
-        const permissions = new Set<string>(
-          roleObj?.roles?.permissions?.map((p: any) => p.permission_code) ?? []
-        )
+        const permissions = new Set<string>(data.permissions ?? [])
+        const roleCode: string | null = data.role_code ?? null
 
         setValue({
-          userId,
+          userId: data.user_id ?? user.id ?? null,
           loaded: true,
           permissions,
           isDirector: roleCode === 'DIRECTOR',
           isAdmin: roleCode === 'ADMIN',
           isWarehouse: roleCode === 'WAREHOUSE',
+          isSystemAdmin: roleCode === 'SYSTEM_ADMIN',
           roleCode,
-          roleName: roleName ?? null,
-          name: profile?.name ?? user.user_metadata?.full_name ?? user.email,
-          email: user.email ?? null,
-          organizationName: profile?.organization_id ?? null,
+          roleName: data.role_name ?? null,
+          name: data.name ?? user.email ?? null,
+          email: data.email ?? user.email ?? null,
+          username: data.username ?? null,
+          organizationId: data.organization_id ?? null,
+          organizationName: data.organization_name ?? null,
         })
       } catch {
         setValue((prev) => ({ ...prev, loaded: true }))
@@ -102,7 +107,7 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       if (!session?.user) {
-        setValue((prev) => ({ ...prev, userId: null, loaded: true, roleName: null, permissions: new Set(), isDirector: false, isAdmin: false, isWarehouse: false }))
+        setValue((prev) => ({ ...prev, userId: null, loaded: true, roleName: null, permissions: new Set(), isDirector: false, isAdmin: false, isWarehouse: false, isSystemAdmin: false }))
         return
       }
       loadSession()

@@ -11,6 +11,7 @@ import {
   Truck,
   ClipboardCheck,
   Users,
+  ShieldCheck,
   ChevronDown,
   ChevronRight,
   Menu,
@@ -93,21 +94,32 @@ const NAV_GROUPS: NavGroup[] = [
       { label: 'Data Master', href: '/master-data', icon: Users },
     ],
   },
+  {
+    label: 'Administrasi',
+    icon: ShieldCheck,
+    items: [
+      { label: 'Pengguna', href: '/settings/users', icon: Users },
+      { label: 'Role & Hak Akses', href: '/settings/roles', icon: ShieldCheck },
+    ],
+  },
 ]
 
 // ─── Role → visible groups ───────────────────────────────────────────────────
 
 function getVisibleGroups(roleCode: string | null): NavGroup[] {
+  if (roleCode === 'SYSTEM_ADMIN') {
+    return NAV_GROUPS
+  }
   if (roleCode === 'WAREHOUSE') {
     return NAV_GROUPS.filter((g) =>
       ['Ringkasan', 'Warehouse'].includes(g.label)
     )
   }
   if (roleCode === 'ADMIN') {
-    return NAV_GROUPS.filter((g) => g.label !== 'Approval')
+    return NAV_GROUPS.filter((g) => !['Approval', 'Administrasi'].includes(g.label))
   }
-  // DIRECTOR or unknown: all
-  return NAV_GROUPS
+  // DIRECTOR or unknown: everything except platform administration
+  return NAV_GROUPS.filter((g) => g.label !== 'Administrasi')
 }
 
 // ─── Sidebar nav item ─────────────────────────────────────────────────────────
@@ -255,15 +267,15 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
         {/* Brand header */}
         <div className="flex items-center gap-3 px-5 h-16 border-b border-white/10 flex-shrink-0">
           <div
-            className="flex items-center justify-center w-9 h-9 rounded-lg flex-shrink-0"
-            style={{ background: 'linear-gradient(135deg, #086b76 0%, #0ea5e9 100%)' }}
+            className="flex items-center justify-center w-9 h-9 rounded-lg flex-shrink-0 bg-white/95 p-1"
           >
-            <Snowflake className="w-5 h-5 text-white" />
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src="/logo/astadeca.png" alt="Astadeca Baswara Persada" className="w-full h-full object-contain" />
           </div>
           {!collapsed && (
             <div className="overflow-hidden">
-              <p className="text-white font-bold text-base leading-tight truncate font-display">
-                ASTADECA
+              <p className="text-white font-bold text-sm leading-tight truncate font-display">
+                Astadeca Baswara Persada
               </p>
               <p className="text-white/40 text-xs leading-tight truncate">
                 Cold Storage ERP
@@ -344,8 +356,9 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
             <Menu className="w-5 h-5" />
           </button>
           <div className="ml-3 flex items-center gap-2">
-            <Snowflake className="w-5 h-5 text-cyan-600" />
-            <span className="font-bold text-slate-800 font-display">ASTADECA</span>
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src="/logo/astadeca.png" alt="Astadeca Baswara Persada" className="w-6 h-6 object-contain" />
+            <span className="font-bold text-slate-800 font-display text-sm">Astadeca Baswara Persada</span>
           </div>
         </header>
 
