@@ -24,12 +24,13 @@ import {
   Boxes,
   ChevronLeft,
   BarChart3,
-  Bell,
   FolderOpen,
   CreditCard,
+  FileSignature,
 } from 'lucide-react'
 import { useSession } from '@/hooks/use-session'
-import LogoutButton from '@/components/logout-button'
+import NotificationBell from '@/components/notification-bell'
+import UserMenu from '@/components/user-menu'
 
 type NavItem = {
   label: string
@@ -61,9 +62,10 @@ const NAV_GROUPS: NavGroup[] = [
     ],
   },
   {
-    label: 'Operasional',
+    label: 'Penjualan & Pembelian',
     icon: Truck,
     items: [
+      { label: 'Permintaan Harga', href: '/operational/quotations', icon: FileSignature },
       { label: 'Purchase Order', href: '/operational/purchase-orders', icon: ShoppingCart },
       { label: 'Sales Order', href: '/operational/sales-orders', icon: FileText },
       { label: 'Delivery Orders', href: '/operational/delivery-orders', icon: Truck },
@@ -89,13 +91,6 @@ const NAV_GROUPS: NavGroup[] = [
     ],
   },
   {
-    label: 'Approval',
-    icon: ClipboardCheck,
-    items: [
-      { label: 'Persetujuan', href: '/approval/requests', icon: ClipboardCheck },
-    ],
-  },
-  {
     label: 'Data Master',
     icon: Users,
     items: [
@@ -107,13 +102,6 @@ const NAV_GROUPS: NavGroup[] = [
     icon: FolderOpen,
     items: [
       { label: 'Dokumen', href: '/documents', icon: FileText },
-    ],
-  },
-  {
-    label: 'Notifikasi',
-    icon: Bell,
-    items: [
-      { label: 'Notifikasi', href: '/notifications', icon: Bell },
     ],
   },
   {
@@ -130,13 +118,13 @@ function getVisibleGroups(roleCode: string | null): (NavGroup | NavItem)[] {
   const visibleGroups = NAV_GROUPS.filter((g) => {
     if (roleCode === 'SYSTEM_ADMIN') return true
     if (roleCode === 'WAREHOUSE') {
-      return ['Cold Storage', 'Warehouse', 'Dokumen', 'Notifikasi'].includes(g.label)
+      return ['Cold Storage', 'Warehouse', 'Dokumen'].includes(g.label)
     }
     if (roleCode === 'ADMIN') {
-      return !['Approval', 'Administrasi'].includes(g.label)
+      return !['Administrasi'].includes(g.label)
     }
     // DIRECTOR or unknown
-    return g.label !== 'Administrasi' && g.label !== 'Notifikasi'
+    return g.label !== 'Administrasi'
   })
 
   // Dashboard is always first, as a top-level item (not in a group)
@@ -236,6 +224,20 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
     return initial
   })
 
+  // Keep the group containing the active route open when navigating
+  useEffect(() => {
+    setOpenGroups((prev) => {
+      const next = new Set(prev)
+      visibleNav.forEach((item) => {
+        if ('items' in item && item.items.some((i) => pathname.startsWith(i.href))) {
+          next.add(item.label)
+        }
+      })
+      return next
+    })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pathname])
+
   function toggleGroup(label: string) {
     setOpenGroups((prev) => {
       const next = new Set(prev)
@@ -326,24 +328,30 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
 
       <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
         {/* Top bar (mobile) */}
-        <header className="flex items-center h-14 px-4 border-b border-slate-200 bg-white flex-shrink-0 lg:hidden">
-          <button
-            onClick={() => setSidebarOpen(true)}
-            className="p-2 rounded-lg text-slate-600 hover:bg-slate-100 transition-colors"
-            aria-label="Buka menu"
-          >
-            <Menu className="w-5 h-5" />
-          </button>
-          <div className="ml-3 flex items-center gap-2">
+        <header className="flex items-center justify-between h-14 px-4 border-b border-slate-200 bg-white flex-shrink-0 lg:hidden">
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setSidebarOpen(true)}
+              className="p-2 rounded-lg text-slate-600 hover:bg-slate-100 transition-colors"
+              aria-label="Buka menu"
+            >
+              <Menu className="w-5 h-5" />
+            </button>
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img src="/logo/astadeca.png" alt="Astadeca Baswara Persada" className="w-6 h-6 object-contain" />
             <span className="font-bold text-slate-800 font-display text-sm">Astadeca Baswara Persada</span>
           </div>
+          <div className="flex items-center gap-1">
+            <NotificationBell />
+            <UserMenu />
+          </div>
         </header>
 
         {/* Top bar (desktop) */}
-        <header className="hidden lg:flex items-center justify-end h-16 px-8 border-b border-slate-200 bg-white flex-shrink-0">
-          <LogoutButton />
+        <header className="hidden lg:flex items-center justify-end gap-2 h-16 px-8 border-b border-slate-200 bg-white flex-shrink-0">
+          <NotificationBell />
+          <div className="w-px h-8 bg-slate-200 mx-1" />
+          <UserMenu />
         </header>
 
         {/* Page content */}

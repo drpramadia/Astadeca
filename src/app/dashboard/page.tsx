@@ -2,7 +2,7 @@
 
 import AppShell from '@/components/app-shell'
 import { useSession } from '@/hooks/use-session'
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import {
@@ -18,7 +18,10 @@ import {
   DollarSign,
   BarChart3,
   Activity,
+  FileSignature,
 } from 'lucide-react'
+import { supabase } from '@/lib/supabase/client'
+import { formatCurrency, formatNumber } from '@/lib/utils'
 
 function StatCard({
   label,
@@ -39,7 +42,7 @@ function StatCard({
         <div>
           <p className="text-sm font-medium text-slate-500">{label}</p>
           <p className="mt-1 text-2xl font-bold text-slate-800 font-display">
-            {typeof value === 'number' ? value.toLocaleString('id-ID') : value}
+            {typeof value === 'number' ? formatNumber(value) : value}
           </p>
         </div>
         <div
@@ -98,14 +101,152 @@ function QuickLink({
 }
 
 export default function DashboardPage() {
-  const { name, roleName, loaded, userId } = useSession()
+  const { name, roleName, loaded, userId, organizationId } = useSession()
   const router = useRouter()
+
+  const [stats, setStats] = useState({
+    activeContracts: 0,
+    pendingPO: 0,
+    pendingSO: 0,
+    deliveryOrders: 0,
+    totalItems: 0,
+    availableItems: 0,
+    reservedItems: 0,
+    quarantineItems: 0,
+    coldStorageUnits: 0,
+    activeContracts2: 0,
+    pendingBillings: 0,
+    utilization: 0,
+    totalRevenue: 0,
+    totalExpense: 0,
+    pendingPayment: 0,
+  })
+  const [loading, setLoading] = useState(true)
 
   useEffect(() => {
     if (loaded && !userId) {
       router.replace('/login')
     }
   }, [loaded, userId, router])
+
+  useEffect(() => {
+    if (!loaded || !userId || !organizationId) return
+    loadStats()
+  }, [loaded, userId, organizationId])
+
+  async function loadStats() {
+    setLoading(true)
+    try {
+      const [
+        activeContractsRes,
+        pendingPORes,
+        pendingSORes,
+        deliveryOrdersRes,
+        inventoryRes,
+        coldStorageRes,
+        revenueRes,
+        expenseRes,
+      ] = await Promise.all([
+        supabase
+          .from('rental_contracts')
+          .select('id', { count: 'exact', head: true })
+          .eq('organization_id', organizationId)
+          .eq('status', 'ACTIVE'),
+        supabase
+          .from('purchase_orders')
+          .select('id', { count: 'exact', head: true })
+          .eq('organization_id', organizationId)
+          .eq('status', 'PENDING_APPROVAL'),
+        supabase
+          .from('sales_orders')
+          .select('id', { count: 'exact', head: true })
+          .eq('organization_id', organizationId)
+          .eq('status', 'PENDING_APPROVAL'),
+        supabase
+          .from('delivery_orders')
+          .select('id', { count: 'exact', head: true })
+          .eq('organization_id', organizationId),
+        supabase
+          .from('inventory')
+          .select('status, quantity_kg')
+          .eq('organization_id', organizationId),
+        supabase
+          .from('cold_storages')
+          .select('id, status', { count: 'exact', head: true })
+          .eq('organization_id', organizationId),
+        supabase
+          .from('transactions')
+          .select('amount')
+          .eq('organization_id', organizationId)
+          .eq('type', 'CREDIT'),
+        supabase
+          .from('transactions')
+          .select('amount')
+          .eq('organization_id', organizationId)
+          .eq('type', 'DEBIT'),
+      ])
+
+      // Inventory breakdown
+      let totalItems = 0, availableItems = 0, reservedItems = 0, quarantineItems = 0
+      ;(inventoryRes.data || []).forEach((row) => {
+        const qty = Number(row.quantity_kg) || 0
+        totalItems += qty
+        if (row.status === 'AVAILABLE') availableItems += qty
+        else if (row.status === 'RESERVED') reservedItems += qty
+        else if (row.status === 'QUARANTINE') quarantineItems += qty
+      })
+
+      const activeContracts = activeContractsRes.count || 0
+      const pendingPO = pendingPORes.count || 0
+      const pendingSO = pendingSORes.count || 0
+      const deliveryOrders = deliveryOrdersRes.count || 0
+      const coldStorageUnits = coldStorageRes.count || 0
+
+      // Calculate utilization (simplified)
+      const utilization = coldStorageUnits > 0 ? Math.min(100, Math.round((activeContracts / coldStorageUnits) * 100)) : 0
+
+      // Revenue/Expense
+      const totalRevenue = (revenueRes.data || []).reduce((sum, r) => sum + Number(r.amount), 0)
+      const totalExpense = (expenseRes.data || []).reduce((sum, r) => sum + Number(r.amount), 0)
+
+      // Pending payment: sum of unpaid billings
+      const { data: billings } = await supabase
+        .from('rental_billing')
+        .select('total_amount, status')
+        .eq('organization_id', organizationId)
+        .in('status', ['DRAFT', 'SENT', 'OVERDUE'])
+      const pendingPayment = (billings || []).reduce((sum, b) => sum + Number(b.total_amount || 0), 0)
+
+      setStats({
+        activeContracts,
+        pendingPO,
+        pendingSO,
+        deliveryOrders,
+        totalItems,
+        availableItems,
+        reservedItems,
+        quarantineItems,
+        coldStorageUnits,
+        activeContracts2: activeContracts,
+        pendingBillings: pendingPayment > 0 ? 1 : 0, // placeholder
+        utilization,
+        totalRevenue,
+        totalExpense,
+        pendingPayment,
+      })
+    } catch (e) {
+      console.error('Failed to load stats:', e)
+    }
+    setLoading(false)
+  }
+
+  const greeting = (() => {
+    const hour = new Date().getHours()
+    if (hour < 12) return 'Selamat Pagi'
+    if (hour < 15) return 'Selamat Siang'
+    if (hour < 18) return 'Selamat Sore'
+    return 'Selamat Malam'
+  })()
 
   if (!loaded || !userId) {
     return (
@@ -122,17 +263,25 @@ export default function DashboardPage() {
     )
   }
 
-  const greeting = (() => {
-    const hour = new Date().getHours()
-    if (hour < 12) return 'Selamat Pagi'
-    if (hour < 15) return 'Selamat Siang'
-    if (hour < 18) return 'Selamat Sore'
-    return 'Selamat Malam'
-  })()
+  if (loading) {
+    return (
+      <AppShell>
+        <div className="p-6 lg:p-8 max-w-7xl mx-auto flex items-center justify-center min-h-[60vh]">
+          <div className="text-center">
+            <div className="inline-flex items-center justify-center w-10 h-10 rounded-full bg-cyan-100 mb-3">
+              <Snowflake className="w-5 h-5 text-cyan-600 animate-pulse" />
+            </div>
+            <p className="text-sm text-slate-500">Memuat data...</p>
+          </div>
+        </div>
+      </AppShell>
+    )
+  }
 
   return (
     <AppShell>
       <div className="p-6 lg:p-8 max-w-7xl mx-auto">
+        {/* Header */}
         <div className="flex items-start justify-between mb-8">
           <div>
             <h1 className="text-2xl font-bold text-slate-800 font-display">
@@ -151,31 +300,32 @@ export default function DashboardPage() {
           </div>
         </div>
 
+        {/* Stats row */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
           <StatCard
             label="Kontrak Aktif"
-            value={0}
+            value={stats.activeContracts}
             icon={FileText}
             color="#086b76"
             href="/cold-storage/contracts"
           />
           <StatCard
-            label="PO Pending"
-            value={0}
+            label="PO Pending Approval"
+            value={stats.pendingPO}
             icon={PackageSearch}
             color="#f59e0b"
             href="/operational/purchase-orders"
           />
           <StatCard
-            label="SO Pending"
-            value={0}
+            label="SO Pending Approval"
+            value={stats.pendingSO}
             icon={Truck}
             color="#0ea5e9"
             href="/operational/sales-orders"
           />
           <StatCard
             label="Delivery Orders"
-            value={0}
+            value={stats.deliveryOrders}
             icon={Warehouse}
             color="#22c55e"
             href="/operational/delivery-orders"
@@ -183,6 +333,7 @@ export default function DashboardPage() {
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          {/* Quick links */}
           <div className="lg:col-span-2">
             <h2 className="text-base font-semibold text-slate-800 mb-4">Navigasi Cepat</h2>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -222,22 +373,22 @@ export default function DashboardPage() {
                 color="#8b5cf6"
               />
               <QuickLink
-                label="Approval"
-                description="Setujui request pending"
-                href="/approval/requests"
-                icon={ClipboardCheck}
+                label="Permintaan Harga"
+                description="Kelola penawaran harga / RFQ"
+                href="/operational/quotations"
+                icon={FileSignature}
                 color="#ef4444"
               />
               <QuickLink
                 label="Finance"
                 description="Laporan keuangan & transaksi"
-                href="/finance"
+                href="/finance/reports"
                 icon={BarChart3}
                 color="#8b5cf6"
               />
               <QuickLink
                 label="Documents"
-                description="Dokumen & cetakan surat jalan"
+                description="Dokumen & cetakan"
                 href="/documents"
                 icon={FileText}
                 color="#086b76"
@@ -245,7 +396,9 @@ export default function DashboardPage() {
             </div>
           </div>
 
+          {/* Right column */}
           <div className="space-y-6">
+            {/* Warehouse overview */}
             <div className="bg-white rounded-xl border border-slate-200 p-5">
               <div className="flex items-center gap-2 mb-4">
                 <TrendingUp className="w-4 h-4 text-cyan-600" />
@@ -254,44 +407,52 @@ export default function DashboardPage() {
               <div className="space-y-3">
                 <div className="flex justify-between items-center">
                   <span className="text-xs text-slate-500">Total Item</span>
-                  <span className="text-sm font-semibold text-slate-800">0</span>
+                  <span className="text-sm font-semibold text-slate-800">{formatNumber(stats.totalItems)} kg</span>
                 </div>
                 <div className="flex justify-between items-center">
                   <span className="text-xs text-slate-500">Available</span>
-                  <span className="text-sm font-semibold text-green-600">0</span>
+                  <span className="text-sm font-semibold text-green-600">{formatNumber(stats.availableItems)} kg</span>
                 </div>
                 <div className="flex justify-between items-center">
                   <span className="text-xs text-slate-500">Reserved</span>
-                  <span className="text-sm font-semibold text-amber-600">0</span>
+                  <span className="text-sm font-semibold text-amber-600">{formatNumber(stats.reservedItems)} kg</span>
                 </div>
                 <div className="flex justify-between items-center">
                   <span className="text-xs text-slate-500">Quarantine</span>
-                  <span className="text-sm font-semibold text-red-600">0</span>
+                  <span className="text-sm font-semibold text-red-600">{formatNumber(stats.quarantineItems)} kg</span>
                 </div>
               </div>
             </div>
 
+            {/* Finance overview */}
             <div className="bg-white rounded-xl border border-slate-200 p-5">
               <div className="flex items-center gap-2 mb-4">
                 <DollarSign className="w-4 h-4 text-cyan-600" />
-                <h3 className="text-sm font-semibold text-slate-800">Finance Overview</h3>
+                <h3 className="text-sm font-semibold text-slate-800">Keuangan Ringkas</h3>
               </div>
               <div className="space-y-3">
                 <div className="flex justify-between items-center">
                   <span className="text-xs text-slate-500">Total Pendapatan</span>
-                  <span className="text-sm font-semibold text-green-600">Rp 0</span>
+                  <span className="text-sm font-semibold text-green-600">{formatCurrency(stats.totalRevenue)}</span>
                 </div>
                 <div className="flex justify-between items-center">
                   <span className="text-xs text-slate-500">Total Pengeluaran</span>
-                  <span className="text-sm font-semibold text-red-600">Rp 0</span>
+                  <span className="text-sm font-semibold text-red-600">{formatCurrency(stats.totalExpense)}</span>
                 </div>
                 <div className="flex justify-between items-center">
-                  <span className="text-xs text-slate-500">Pending Payment</span>
-                  <span className="text-sm font-semibold text-amber-600">Rp 0</span>
+                  <span className="text-xs text-slate-500">Pending Tagihan</span>
+                  <span className="text-sm font-semibold text-amber-600">{formatCurrency(stats.pendingPayment)}</span>
+                </div>
+                <div className="flex justify-between items-center">
+                  <span className="text-xs text-slate-500">Saldo Bersih</span>
+                  <span className={`text-sm font-semibold ${stats.totalRevenue >= stats.totalExpense ? 'text-green-600' : 'text-red-600'}`}>
+                    {formatCurrency(stats.totalRevenue - stats.totalExpense)}
+                  </span>
                 </div>
               </div>
             </div>
 
+            {/* Cold Storage status */}
             <div className="bg-white rounded-xl border border-slate-200 p-5">
               <div className="flex items-center gap-2 mb-4">
                 <Snowflake className="w-4 h-4 text-cyan-600" />
@@ -300,30 +461,31 @@ export default function DashboardPage() {
               <div className="space-y-3">
                 <div className="flex justify-between items-center">
                   <span className="text-xs text-slate-500">Cold Storage Units</span>
-                  <span className="text-sm font-semibold text-slate-800">0</span>
+                  <span className="text-sm font-semibold text-slate-800">{stats.coldStorageUnits}</span>
                 </div>
                 <div className="flex justify-between items-center">
                   <span className="text-xs text-slate-500">Active Contracts</span>
-                  <span className="text-sm font-semibold text-slate-800">0</span>
+                  <span className="text-sm font-semibold text-slate-800">{stats.activeContracts2}</span>
                 </div>
                 <div className="flex justify-between items-center">
                   <span className="text-xs text-slate-500">Pending Billings</span>
-                  <span className="text-sm font-semibold text-amber-600">0</span>
+                  <span className="text-sm font-semibold text-amber-600">{stats.pendingBillings}</span>
                 </div>
                 <div className="flex justify-between items-center">
                   <span className="text-xs text-slate-500">Utilization</span>
-                  <span className="text-sm font-semibold text-slate-800">0%</span>
+                  <span className="text-sm font-semibold text-slate-800">{stats.utilization}%</span>
                 </div>
               </div>
             </div>
 
+            {/* Recent Activity placeholder */}
             <div className="bg-white rounded-xl border border-slate-200 p-5">
               <div className="flex items-center gap-2 mb-4">
                 <Activity className="w-4 h-4 text-slate-400" />
                 <h3 className="text-sm font-semibold text-slate-800">Aktivitas Terakhir</h3>
               </div>
               <p className="text-sm text-slate-400 text-center py-4">
-                Belum ada aktivitas terakhir.
+                Fitur aktivitas terakhir akan segera hadir.
               </p>
             </div>
           </div>
