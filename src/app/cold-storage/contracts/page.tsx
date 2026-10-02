@@ -125,7 +125,9 @@ export default function ContractsPage() {
               ) : (
                 filtered.map((row) => (
                   <tr key={row.id} className="border-b border-slate-100 hover:bg-slate-50 transition-colors">
-                    <td className="px-4 py-3 font-mono font-medium text-cyan-700">{row.contract_number}</td>
+                    <td className="px-4 py-3 font-mono font-medium">
+                      <Link href={`/cold-storage/contracts/${row.id}`} className="text-cyan-700 hover:text-cyan-900 hover:underline">{row.contract_number}</Link>
+                    </td>
                     <td className="px-4 py-3 font-medium text-slate-800">{row.rental_customers?.name ?? '-'}</td>
                     <td className="px-4 py-3 text-slate-600">{row.cold_storages?.name ?? '-'}</td>
                     <td className="px-4 py-3 text-right font-mono text-slate-700">{row.total_estimated_kg.toLocaleString('id-ID')} kg</td>
