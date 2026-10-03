@@ -112,9 +112,14 @@ export default function NotificationBell() {
       setNotifications((prev) => prev.map((x) => (x.id === n.id ? { ...x, is_read: true } : x)))
     }
     setOpen(false)
-    if (n.reference_type === 'APPROVAL' && canApprove) {
-      setTab('approvals')
-      setOpen(true)
+
+    // Notifikasi persetujuan -> langsung ke halaman detail approval
+    if (n.reference_type === 'APPROVAL' && n.reference_id) {
+      if (canApprove) {
+        router.push(`/approval/requests/${n.reference_id}`)
+        return
+      }
+      router.push('/approval/requests')
       return
     }
     router.push('/notifications')

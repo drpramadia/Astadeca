@@ -11,7 +11,8 @@
     "test:db": "node scripts/e2e-audit.mjs && node scripts/test-basket.mjs && node scripts/test-spot.mjs && node scripts/test-release-gate.mjs && node scripts/test-delivery-flow.mjs",
     "test:auth": "node scripts/test-auth-rls.mjs",
     "test:password": "node scripts/test-self-password.mjs",
-    "test:admin": "node scripts/test-admin-flows.mjs"
+    "test:admin": "node scripts/test-admin-flows.mjs",
+    "test:approval": "node scripts/test-approval-flow.mjs"
   },
   "dependencies": {
     "@react-pdf/renderer": "^4.9.0",
