@@ -8,6 +8,7 @@ import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { Loader2, X, Plus } from 'lucide-react'
 import { useForm, useFieldArray } from 'react-hook-form'
+import { useRentalSettings } from '@/hooks/use-rental-settings'
 
 type Customer = { id: string; name: string }
 type ColdStorage = { id: string; name: string }
@@ -27,6 +28,7 @@ interface ContractFormData {
 export default function NewContractPage() {
   const { roleCode, loaded, organizationId } = useSession()
   const router = useRouter()
+  const { settings } = useRentalSettings(organizationId)
   
   const [customers, setCustomers] = useState<Customer[]>([])
   const [coldStorages, setColdStorages] = useState<ColdStorage[]>([])
@@ -38,6 +40,14 @@ export default function NewContractPage() {
     defaultValues: { customer_id: '', cold_storage_id: '', start_date: '', end_date: '', total_estimated_kg: '', notes: '', items: [{ basket_id: '', allocated_kg: '' }] }
   })
   const { fields, append, remove } = useFieldArray({ control, name: 'items' })
+
+  // Isi tarif default dari pengaturan global
+  useEffect(() => {
+    if (settings.tariff_per_kg_per_day) {
+      setValue('price_per_kg_per_day', String(settings.tariff_per_kg_per_day))
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [settings.tariff_per_kg_per_day])
 
   const canAccess = roleCode === 'DIRECTOR' || roleCode === 'ADMIN'
 

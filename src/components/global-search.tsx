@@ -15,6 +15,7 @@ import {
   Package,
   Loader2,
   Command,
+  ShieldCheck,
 } from 'lucide-react'
 
 type Result = {
@@ -95,6 +96,14 @@ export function GlobalSearch() {
       { id: 'm-qc', label: 'QC Inspection', href: '/warehouse/qc', group: 'Menu', icon: ClipboardCheck },
       { id: 'm-docs', label: 'Dokumen', href: '/documents', group: 'Menu', icon: FileText },
     ]
+
+    if (role === 'SYSTEM_ADMIN') {
+      menu.push(
+        { id: 'm-users', label: 'Pengguna', href: '/settings/users', group: 'Menu', icon: Users },
+        { id: 'm-roles', label: 'Role & Hak Akses', href: '/settings/roles', group: 'Menu', icon: ShieldCheck },
+        { id: 'm-global', label: 'Pengaturan Global', href: '/settings/global', group: 'Menu', icon: ShieldCheck },
+      )
+    }
 
     if (canSeeOps) {
       menu.push(

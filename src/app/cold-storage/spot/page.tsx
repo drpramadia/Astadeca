@@ -6,6 +6,7 @@ import { useSession } from '@/hooks/use-session'
 import { useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabase/client'
 import { formatDate, formatCurrency } from '@/lib/utils'
+import { useRentalSettings } from '@/hooks/use-rental-settings'
 import { Search, Loader2, X, Plus, CalendarClock, Wallet } from 'lucide-react'
 
 type Spot = {
@@ -26,10 +27,10 @@ type Spot = {
 type Customer = { id: string; name: string }
 type ColdStorage = { id: string; name: string }
 
-const RATE = 100
-
 export default function SpotPage() {
   const { roleCode, loaded, organizationId, userId } = useSession()
+  const { settings } = useRentalSettings(organizationId)
+  const RATE = settings.tariff_per_kg_per_day
   const [data, setData] = useState<Spot[]>([])
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')

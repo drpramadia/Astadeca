@@ -28,6 +28,7 @@ import {
   CreditCard,
   FileSignature,
   Database,
+  Settings,
 } from 'lucide-react'
 import { useSession } from '@/hooks/use-session'
 import NotificationBell from '@/components/notification-bell'
@@ -118,6 +119,7 @@ const NAV_GROUPS: NavGroup[] = [
     items: [
       { label: 'Pengguna', href: '/settings/users', icon: Users },
       { label: 'Role & Hak Akses', href: '/settings/roles', icon: ShieldCheck },
+      { label: 'Pengaturan Global', href: '/settings/global', icon: Settings },
     ],
   },
 ]
