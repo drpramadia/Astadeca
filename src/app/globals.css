@@ -29,3 +29,42 @@
     @apply bg-slate-400;
   }
 }
+
+/* ============================================================
+   PRINT / PDF LAYOUT
+   Semua dokumen (surat jalan, invoice, PO, SO, kontrak, GR, dll)
+   dicetak lewat window.print(). Lihat src/lib/print.ts.
+   ============================================================ */
+@media print {
+  body.printing > * {
+    display: none !important;
+  }
+
+  body.printing .print-target {
+    display: block !important;
+    position: static !important;
+  }
+
+  .print-target {
+    background: #fff !important;
+  }
+
+  .no-print {
+    display: none !important;
+  }
+
+  .print-page {
+    box-shadow: none !important;
+    border: none !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    max-width: none !important;
+    width: 100% !important;
+  }
+
+  @page {
+    size: A4;
+    margin: 14mm;
+  }
+}
+

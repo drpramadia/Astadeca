@@ -1,11 +1,13 @@
 'use client'
 
 import AppShell from '@/components/app-shell'
+import { Modal } from '@/components/ui/modal'
+import { DocumentPrintView, type DocumentPrintData } from '@/components/document-print'
 import { useSession } from '@/hooks/use-session'
 import { useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabase/client'
 import { formatCurrency, formatDate } from '@/lib/utils'
-import { Search, CreditCard, Loader2, X, Plus, Trash2, Pencil, Calendar } from 'lucide-react'
+import { Search, CreditCard, Loader2, X, Plus, Trash2, Pencil, Calendar, Printer } from 'lucide-react'
 
 type Payment = {
   id: string
@@ -35,6 +37,8 @@ export default function PaymentsPage() {
   const [showForm, setShowForm] = useState(false)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [printData, setPrintData] = useState<DocumentPrintData | null>(null)
+  const [loadingPrint, setLoadingPrint] = useState(false)
   const [form, setForm] = useState({
     amount: '',
     payment_method: 'BANK_TRANSFER',
@@ -110,6 +114,56 @@ export default function PaymentsPage() {
 
   const totalAmount = data.reduce((sum, r) => sum + Number(r.amount), 0)
 
+  function openPrintReport() {
+    const today = new Date().toISOString().split('T')[0]
+    setLoadingPrint(true)
+    setPrintData(null)
+    setPrintData({
+      docType: 'Laporan',
+      docNumber: `LAP-PAY-${today}`,
+      date: today,
+      status: null,
+      meta: [
+        { label: 'Jumlah Data', value: String(filtered.length) },
+        { label: 'Total', value: formatCurrency(totalAmount) },
+      ],
+      lines: filtered.map((r) => ({
+        name: `${formatDate(r.payment_date)} — ${PAYMENT_METHOD_LABELS[r.payment_method] ?? r.payment_method}${r.bank_account ? ` (${r.bank_account})` : ''}${r.notes ? ` · ${r.notes}` : ''}`,
+        quantity: r.amount,
+        unit: 'Rp',
+      })),
+      totals: [{ label: 'Total Pembayaran', value: totalAmount }],
+      signatures: ['Dibuat Oleh', 'Disetujui'],
+    })
+    setLoadingPrint(false)
+  }
+
+  function openPrintRow(row: Payment) {
+    setLoadingPrint(true)
+    setPrintData(null)
+    setPrintData({
+      docType: 'Bukti Pembayaran',
+      docNumber: `PAY-${row.id.slice(0, 8)}`,
+      date: row.payment_date,
+      status: null,
+      meta: [
+        { label: 'Metode', value: PAYMENT_METHOD_LABELS[row.payment_method] ?? row.payment_method },
+        { label: 'Bank Account', value: row.bank_account ?? '-' },
+        { label: 'Oleh', value: row.profiles?.full_name ?? '-' },
+      ],
+      lines: [
+        {
+          name: row.notes ?? 'Pembayaran',
+          quantity: row.amount,
+          unit: 'Rp',
+        },
+      ],
+      totals: [{ label: 'Total', value: row.amount }],
+      signatures: ['Dibuat Oleh', 'Diterima Oleh'],
+    })
+    setLoadingPrint(false)
+  }
+
   return (
     <AppShell>
       <div className="p-6 lg:p-8 max-w-7xl mx-auto">
@@ -123,14 +177,21 @@ export default function PaymentsPage() {
             </div>
             <p className="text-sm text-slate-500">Total: {formatCurrency(totalAmount)}</p>
           </div>
-          <button
-            onClick={() => setShowForm(true)}
-            className="flex items-center gap-2 px-4 py-2 bg-primary hover:bg-primary/90 text-white text-sm font-medium rounded-lg transition-colors"
-          >
-            <Plus className="w-4 h-4" /> <span>Baru</span>
-          </button>
+          <div className="flex items-center gap-3">
+            <button
+              onClick={openPrintReport}
+              className="flex items-center gap-2 px-4 py-2 bg-white border border-line text-ink text-sm font-medium rounded-lg hover:bg-slate-50 transition-colors"
+            >
+              <Printer className="w-4 h-4" /> <span>Cetak Laporan</span>
+            </button>
+            <button
+              onClick={() => setShowForm(true)}
+              className="flex items-center gap-2 px-4 py-2 bg-primary hover:bg-primary/90 text-white text-sm font-medium rounded-lg transition-colors"
+            >
+              <Plus className="w-4 h-4" /> <span>Baru</span>
+            </button>
+          </div>
         </div>
-
         {error && <div className="p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700 mb-4">{error}</div>}
 
         {showForm && (
@@ -258,6 +319,13 @@ export default function PaymentsPage() {
                     <td className="px-4 py-3 text-slate-600 text-xs">{row.profiles?.full_name ?? '-'}</td>
                     <td className="px-4 py-3 text-center">
                       <button
+                        onClick={() => openPrintRow(row)}
+                        className="p-2 rounded-lg text-slate-400 hover:text-primary hover:bg-primary/5 transition-colors"
+                        title="Cetak"
+                      >
+                        <Printer className="w-4 h-4" />
+                      </button>
+                      <button
                         onClick={() => handleDelete(row.id)}
                         className="p-2 rounded-lg text-slate-400 hover:text-red-500 hover:bg-red-50 transition-colors"
                         title="Hapus"
@@ -272,6 +340,15 @@ export default function PaymentsPage() {
           </table>
         </div>
       </div>
+
+      {/* Pratinjau / cetak laporan pembayaran */}
+      <Modal open={!!printData || loadingPrint} onClose={() => setPrintData(null)} title="Laporan" size="xl">
+        {loadingPrint || !printData ? (
+          <div className="py-16 text-center text-slate-400"><Loader2 className="w-6 h-6 animate-spin mx-auto" /></div>
+        ) : (
+          <DocumentPrintView data={printData} onClose={() => setPrintData(null)} />
+        )}
+      </Modal>
     </AppShell>
   )
 }

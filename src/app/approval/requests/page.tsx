@@ -75,6 +75,7 @@ export default function ApprovalPage() {
         } else if (refType === 'CONTRACT') {
           await supabase.from('rental_contracts').update({ status: 'ACTIVE' }).eq('id', refId)
         } else if (refType === 'DELIVERY') {
+          // Surat jalan otomatis diterbitkan oleh trigger DB (issue_delivery_order)
           await supabase.from('delivery_requests').update({ status: 'APPROVED' }).eq('id', refId)
         }
       } else if (decision === 'REJECTED') {

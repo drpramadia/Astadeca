@@ -2,11 +2,13 @@
 
 import AppShell from '@/components/app-shell'
 import { StatusBadge } from '@/components/ui/status-badge'
+import { Modal } from '@/components/ui/modal'
+import { DocumentPrintView, type DocumentPrintData } from '@/components/document-print'
 import { useSession } from '@/hooks/use-session'
 import { useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabase/client'
 import Link from 'next/link'
-import { Plus, Search, ShoppingCart, Loader2 } from 'lucide-react'
+import { Plus, Search, ShoppingCart, Loader2, Printer } from 'lucide-react'
 
 type PO = {
   id: string
@@ -18,12 +20,21 @@ type PO = {
   profiles: { full_name: string } | null
 }
 
+type POLine = {
+  quantity_kg: number
+  price_per_kg: number
+  subtotal: number
+  products: { name: string; sku: string | null } | null
+}
+
 export default function PurchaseOrdersPage() {
   const { roleCode, loaded, organizationId } = useSession()
   const [data, setData] = useState<PO[]>([])
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
   const [statusFilter, setStatusFilter] = useState('')
+  const [printData, setPrintData] = useState<DocumentPrintData | null>(null)
+  const [loadingPrint, setLoadingPrint] = useState(false)
   
 
   const canAccess = roleCode === 'DIRECTOR' || roleCode === 'ADMIN'
@@ -48,6 +59,49 @@ export default function PurchaseOrdersPage() {
   }
 
   useEffect(() => { if (!loading) fetchData() }, [statusFilter])
+
+  async function openPrint(poId: string) {
+    setLoadingPrint(true)
+    setPrintData(null)
+    const { data: poRow } = await supabase
+      .from('purchase_orders')
+      .select('*, suppliers(name), profiles(full_name)')
+      .eq('id', poId)
+      .single()
+    const { data: poLines } = await supabase
+      .from('purchase_order_lines')
+      .select('quantity_kg, price_per_kg, subtotal, products(name, sku)')
+      .eq('po_id', poId)
+
+    if (poRow) {
+      const row = poRow as unknown as PO
+      const lines = (poLines as POLine[] | null) || []
+      const total = lines.reduce((sum, l) => sum + Number(l.subtotal || 0), 0)
+      setPrintData({
+        docType: 'Purchase Order',
+        docNumber: row.po_number,
+        date: row.created_at,
+        status: row.status,
+        meta: [
+          { label: 'Dibuat Oleh', value: row.profiles?.full_name ?? '-' },
+          { label: 'Tanggal', value: new Date(row.created_at).toLocaleDateString('id-ID') },
+        ],
+        party: row.suppliers ? { title: 'Kepada:', lines: [row.suppliers.name] } : undefined,
+        lines: lines.map((l) => ({
+          name: l.products?.name ?? '-',
+          sku: l.products?.sku,
+          quantity: l.quantity_kg,
+          unit: 'kg',
+          price: l.price_per_kg,
+          subtotal: l.subtotal,
+        })),
+        totals: [{ label: 'Total', value: total }],
+        notes: row.notes,
+        signatures: ['Dibuat Oleh', 'Disetujui'],
+      })
+    }
+    setLoadingPrint(false)
+  }
 
   if (loaded && !canAccess) {
     return <AppShell><div className="p-6 text-center text-slate-500">Anda tidak memiliki akses.</div></AppShell>
@@ -104,13 +158,14 @@ export default function PurchaseOrdersPage() {
                 <th className="text-left px-4 py-3 font-semibold text-slate-600">Dibuat Oleh</th>
                 <th className="text-center px-4 py-3 font-semibold text-slate-600">Status</th>
                 <th className="text-right px-4 py-3 font-semibold text-slate-600">Tanggal</th>
+                <th className="text-center px-4 py-3 font-semibold text-slate-600">Aksi</th>
               </tr>
             </thead>
             <tbody>
               {loading ? (
-                <tr><td colSpan={5} className="text-center py-12 text-slate-400"><Loader2 className="w-6 h-6 animate-spin mx-auto" /></td></tr>
+                <tr><td colSpan={6} className="text-center py-12 text-slate-400"><Loader2 className="w-6 h-6 animate-spin mx-auto" /></td></tr>
               ) : filtered.length === 0 ? (
-                <tr><td colSpan={5} className="text-center py-12 text-slate-400"><ShoppingCart className="w-8 h-8 mx-auto mb-2 opacity-30" /><p>Belum ada Purchase Order</p></td></tr>
+                <tr><td colSpan={6} className="text-center py-12 text-slate-400"><ShoppingCart className="w-8 h-8 mx-auto mb-2 opacity-30" /><p>Belum ada Purchase Order</p></td></tr>
               ) : (
                 filtered.map((row) => (
                   <tr key={row.id} className="border-b border-slate-100 hover:bg-slate-50 transition-colors">
@@ -121,6 +176,11 @@ export default function PurchaseOrdersPage() {
                       <StatusBadge status={row.status} />
                     </td>
                     <td className="px-4 py-3 text-right text-slate-500 text-xs">{new Date(row.created_at).toLocaleDateString('id-ID')}</td>
+                    <td className="px-4 py-3 text-center">
+                      <button onClick={() => openPrint(row.id)} className="inline-flex items-center gap-1 px-3 py-1.5 text-xs font-medium text-primary border border-primary/30 rounded-lg hover:bg-primary/5 transition-colors">
+                        <Printer className="w-3.5 h-3.5" /> Cetak
+                      </button>
+                    </td>
                   </tr>
                 ))
               )}
@@ -128,6 +188,15 @@ export default function PurchaseOrdersPage() {
           </table>
         </div>
       </div>
+
+      {/* Pratinjau / cetak purchase order */}
+      <Modal open={!!printData || loadingPrint} onClose={() => setPrintData(null)} title="Purchase Order" size="xl">
+        {loadingPrint || !printData ? (
+          <div className="py-16 text-center text-slate-400"><Loader2 className="w-6 h-6 animate-spin mx-auto" /></div>
+        ) : (
+          <DocumentPrintView data={printData} onClose={() => setPrintData(null)} />
+        )}
+      </Modal>
     </AppShell>
   )
 }

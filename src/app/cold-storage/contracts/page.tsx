@@ -2,11 +2,13 @@
 
 import AppShell from '@/components/app-shell'
 import { StatusBadge } from '@/components/ui/status-badge'
+import { Modal } from '@/components/ui/modal'
+import { DocumentPrintView, type DocumentPrintData } from '@/components/document-print'
 import { useSession } from '@/hooks/use-session'
 import { useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabase/client'
 import Link from 'next/link'
-import { Plus, Search, FileText, Loader2 } from 'lucide-react'
+import { Plus, Search, FileText, Loader2, Printer } from 'lucide-react'
 
 type Contract = {
   id: string
@@ -28,6 +30,8 @@ export default function ContractsPage() {
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
   const [statusFilter, setStatusFilter] = useState('')
+  const [printData, setPrintData] = useState<DocumentPrintData | null>(null)
+  const [loadingPrint, setLoadingPrint] = useState(false)
   
 
   const canAccess = roleCode === 'DIRECTOR' || roleCode === 'ADMIN'
@@ -54,6 +58,32 @@ export default function ContractsPage() {
   useEffect(() => {
     if (!loading) fetchData()
   }, [statusFilter])
+
+  function openPrint(row: Contract) {
+    setPrintData({
+      docType: 'Kontrak Rental',
+      docNumber: row.contract_number,
+      date: row.start_date,
+      status: row.status,
+      meta: [
+        { label: 'Customer', value: row.rental_customers?.name ?? '-' },
+        { label: 'Cold Storage', value: row.cold_storages?.name ?? '-' },
+        { label: 'Periode', value: `${new Date(row.start_date).toLocaleDateString('id-ID')} - ${new Date(row.end_date).toLocaleDateString('id-ID')}` },
+        { label: 'Tarif per Kg/Hari', value: `Rp ${Number(row.price_per_kg_per_day).toLocaleString('id-ID')}` },
+      ],
+      lines: [
+        {
+          name: 'Estimasi Kapasitas Rental',
+          quantity: row.total_estimated_kg,
+          unit: 'kg',
+          price: row.price_per_kg_per_day,
+        },
+      ],
+      totals: [{ label: 'Total Estimasi Kg', value: `${Number(row.total_estimated_kg).toLocaleString('id-ID')} kg` }],
+      notes: row.notes,
+      signatures: ['Pihak Penyewa', 'Pihak Cold Storage'],
+    })
+  }
 
   if (loaded && !canAccess) {
     return (
@@ -115,13 +145,14 @@ export default function ContractsPage() {
                 <th className="text-right px-4 py-3 font-semibold text-slate-600">Tarif/kg/hari</th>
                 <th className="text-center px-4 py-3 font-semibold text-slate-600">Periode</th>
                 <th className="text-center px-4 py-3 font-semibold text-slate-600">Status</th>
+                <th className="text-center px-4 py-3 font-semibold text-slate-600">Aksi</th>
               </tr>
             </thead>
             <tbody>
               {loading ? (
-                <tr><td colSpan={7} className="text-center py-12 text-slate-400"><Loader2 className="w-6 h-6 animate-spin mx-auto" /></td></tr>
+                <tr><td colSpan={8} className="text-center py-12 text-slate-400"><Loader2 className="w-6 h-6 animate-spin mx-auto" /></td></tr>
               ) : filtered.length === 0 ? (
-                <tr><td colSpan={7} className="text-center py-12 text-slate-400"><FileText className="w-8 h-8 mx-auto mb-2 opacity-30" /><p>Belum ada kontrak</p></td></tr>
+                <tr><td colSpan={8} className="text-center py-12 text-slate-400"><FileText className="w-8 h-8 mx-auto mb-2 opacity-30" /><p>Belum ada kontrak</p></td></tr>
               ) : (
                 filtered.map((row) => (
                   <tr key={row.id} className="border-b border-slate-100 hover:bg-slate-50 transition-colors">
@@ -138,6 +169,11 @@ export default function ContractsPage() {
                     <td className="px-4 py-3 text-center">
                       <StatusBadge status={row.status} />
                     </td>
+                    <td className="px-4 py-3 text-center">
+                      <button onClick={() => openPrint(row)} className="inline-flex items-center gap-1 px-3 py-1.5 text-xs font-medium text-primary border border-primary/30 rounded-lg hover:bg-primary/5 transition-colors">
+                        <Printer className="w-3.5 h-3.5" /> Cetak
+                      </button>
+                    </td>
                   </tr>
                 ))
               )}
@@ -145,6 +181,15 @@ export default function ContractsPage() {
           </table>
         </div>
       </div>
+
+      {/* Pratinjau / cetak kontrak rental */}
+      <Modal open={!!printData || loadingPrint} onClose={() => setPrintData(null)} title="Kontrak Rental" size="xl">
+        {loadingPrint || !printData ? (
+          <div className="py-16 text-center text-slate-400"><Loader2 className="w-6 h-6 animate-spin mx-auto" /></div>
+        ) : (
+          <DocumentPrintView data={printData} onClose={() => setPrintData(null)} />
+        )}
+      </Modal>
     </AppShell>
   )
 }

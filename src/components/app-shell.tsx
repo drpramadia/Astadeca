@@ -27,6 +27,7 @@ import {
   FolderOpen,
   CreditCard,
   FileSignature,
+  Database,
 } from 'lucide-react'
 import { useSession } from '@/hooks/use-session'
 import NotificationBell from '@/components/notification-bell'
@@ -42,6 +43,7 @@ type NavGroup = {
   label: string
   icon: React.ElementType
   items: NavItem[]
+  badge?: string
 }
 
 const DASHBOARD_ITEM: NavItem = {
@@ -54,6 +56,7 @@ const NAV_GROUPS: NavGroup[] = [
   {
     label: 'Cold Storage',
     icon: Snowflake,
+    badge: '2 unit',
     items: [
       { label: 'Rental Inquiry', href: '/cold-storage/inquiries', icon: PackageSearch },
       { label: 'Kontrak', href: '/cold-storage/contracts', icon: FileText },
@@ -68,7 +71,7 @@ const NAV_GROUPS: NavGroup[] = [
       { label: 'Permintaan Harga', href: '/operational/quotations', icon: FileSignature },
       { label: 'Purchase Order', href: '/operational/purchase-orders', icon: ShoppingCart },
       { label: 'Sales Order', href: '/operational/sales-orders', icon: FileText },
-      { label: 'Delivery Orders', href: '/operational/delivery-orders', icon: Truck },
+      { label: 'Surat Jalan', href: '/operational/delivery-orders', icon: Truck },
     ],
   },
   {
@@ -92,16 +95,18 @@ const NAV_GROUPS: NavGroup[] = [
   },
   {
     label: 'Data Master',
-    icon: Users,
+    icon: Database,
     items: [
-      { label: 'Data Master', href: '/master-data', icon: Users },
+      { label: 'Produk', href: '/master/products', icon: Boxes },
+      { label: 'Customer', href: '/master/customers', icon: Users },
+      { label: 'Supplier', href: '/master/suppliers', icon: Truck },
     ],
   },
   {
     label: 'Dokumen',
     icon: FolderOpen,
     items: [
-      { label: 'Dokumen', href: '/documents', icon: FileText },
+      { label: 'Dokumen & Cetakan', href: '/documents', icon: FileText },
     ],
   },
   {
@@ -130,7 +135,6 @@ function getVisibleGroups(roleCode: string | null): (NavGroup | NavItem)[] {
   // Dashboard is always first, as a top-level item (not in a group)
   return [DASHBOARD_ITEM, ...visibleGroups]
 }
-
 function NavLink({ item, isActive }: { item: NavItem; isActive: boolean }) {
   const Icon = item.icon
   return (
@@ -174,6 +178,11 @@ function NavGroupRow({
       >
         <Icon className="w-4 h-4 flex-shrink-0" />
         <span className="flex-1 text-left">{group.label}</span>
+        {group.badge && (
+          <span className="px-1.5 py-0.5 rounded-full bg-cyan-500/20 text-cyan-300 text-[10px] font-semibold">
+            {group.badge}
+          </span>
+        )}
         {isOpen ? (
           <ChevronDown className="w-3.5 h-3.5" />
         ) : (
@@ -210,6 +219,12 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
 
   const [openGroups, setOpenGroups] = useState<Set<string>>(() => {
     const initial = new Set<string>()
+    try {
+      const saved = typeof window !== 'undefined' ? window.localStorage.getItem('astadeca.nav.open') : null
+      if (saved) JSON.parse(saved).forEach((label: string) => initial.add(label))
+    } catch {
+      /* ignore corrupt storage */
+    }
     visibleNav.forEach((item) => {
       if ('items' in item) {
         if (item.items.some((i) => pathname.startsWith(i.href))) {
@@ -223,6 +238,15 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
     }
     return initial
   })
+
+  // Persist which nav groups are open
+  useEffect(() => {
+    try {
+      window.localStorage.setItem('astadeca.nav.open', JSON.stringify(Array.from(openGroups)))
+    } catch {
+      /* ignore */
+    }
+  }, [openGroups])
 
   // Keep the group containing the active route open when navigating
   useEffect(() => {

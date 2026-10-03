@@ -2,10 +2,12 @@
 
 import AppShell from '@/components/app-shell'
 import { StatusBadge } from '@/components/ui/status-badge'
+import { Modal } from '@/components/ui/modal'
+import { DocumentPrintView, type DocumentPrintData } from '@/components/document-print'
 import { useSession } from '@/hooks/use-session'
 import { useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabase/client'
-import { Search, DollarSign, Loader2 } from 'lucide-react'
+import { Search, DollarSign, Loader2, Printer } from 'lucide-react'
 
 type Billing = {
   id: string
@@ -19,11 +21,20 @@ type Billing = {
   rental_customers: { name: string } | null
 }
 
+type BillingLine = {
+  description: string
+  quantity_kg: number
+  price_per_kg: number
+  subtotal: number
+}
+
 export default function BillingPage() {
   const { roleName, loaded, organizationId } = useSession()
   const [data, setData] = useState<Billing[]>([])
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
+  const [printData, setPrintData] = useState<DocumentPrintData | null>(null)
+  const [loadingPrint, setLoadingPrint] = useState(false)
 
   useEffect(() => {
     if (!loaded) return
@@ -40,6 +51,39 @@ export default function BillingPage() {
       .limit(100)
     setData((rows as Billing[]) || [])
     setLoading(false)
+  }
+
+  async function openPrint(row: Billing) {
+    setLoadingPrint(true)
+    setPrintData(null)
+    const { data: lineRows } = await supabase
+      .from('rental_billing_lines')
+      .select('description, quantity_kg, price_per_kg, subtotal')
+      .eq('billing_id', row.id)
+    const lines = (lineRows as BillingLine[] | null) || []
+    const customer = (row as Billing & { rental_customers?: { name: string } | null }).rental_customers
+
+    setPrintData({
+      docType: 'Invoice',
+      docNumber: row.invoice_number,
+      date: row.created_at,
+      status: row.status,
+      meta: [
+        { label: 'No. Kontrak', value: row.rental_contracts?.contract_number ?? '-' },
+        { label: 'Periode', value: `${new Date(row.period_start).toLocaleDateString('id-ID')} - ${new Date(row.period_end).toLocaleDateString('id-ID')}` },
+      ],
+      party: customer ? { title: 'Kepada:', lines: [customer.name] } : undefined,
+      lines: lines.map((l) => ({
+        name: l.description,
+        quantity: l.quantity_kg,
+        unit: 'kg',
+        price: l.price_per_kg,
+        subtotal: l.subtotal,
+      })),
+      totals: [{ label: 'Total Tagihan', value: row.total_amount }],
+      signatures: ['Dibuat Oleh', 'Diterima Oleh'],
+    })
+    setLoadingPrint(false)
   }
 
   const filtered = data.filter((r) => {
@@ -77,13 +121,14 @@ export default function BillingPage() {
                 <th className="text-left px-4 py-3 font-semibold text-slate-600">Periode</th>
                 <th className="text-center px-4 py-3 font-semibold text-slate-600">Status</th>
                 <th className="text-right px-4 py-3 font-semibold text-slate-600">Tanggal</th>
+                <th className="text-center px-4 py-3 font-semibold text-slate-600">Aksi</th>
               </tr>
             </thead>
             <tbody>
               {loading ? (
-                <tr><td colSpan={7} className="text-center py-12 text-slate-400"><Loader2 className="w-6 h-6 animate-spin mx-auto" /></td></tr>
+                <tr><td colSpan={8} className="text-center py-12 text-slate-400"><Loader2 className="w-6 h-6 animate-spin mx-auto" /></td></tr>
               ) : filtered.length === 0 ? (
-                <tr><td colSpan={7} className="text-center py-12 text-slate-400"><DollarSign className="w-8 h-8 mx-auto mb-2 opacity-30" /><p>Belum ada billing</p></td></tr>
+                <tr><td colSpan={8} className="text-center py-12 text-slate-400"><DollarSign className="w-8 h-8 mx-auto mb-2 opacity-30" /><p>Belum ada billing</p></td></tr>
               ) : (
                 filtered.map((row) => (
                   <tr key={row.id} className="border-b border-slate-100 hover:bg-slate-50 transition-colors">
@@ -98,6 +143,11 @@ export default function BillingPage() {
                       <StatusBadge status={row.status} />
                     </td>
                     <td className="px-4 py-3 text-right text-slate-500 text-xs">{new Date(row.created_at).toLocaleDateString('id-ID')}</td>
+                    <td className="px-4 py-3 text-center">
+                      <button onClick={() => openPrint(row)} className="inline-flex items-center gap-1 px-3 py-1.5 text-xs font-medium text-primary border border-primary/30 rounded-lg hover:bg-primary/5 transition-colors">
+                        <Printer className="w-3.5 h-3.5" /> Cetak
+                      </button>
+                    </td>
                   </tr>
                 ))
               )}
@@ -105,6 +155,15 @@ export default function BillingPage() {
           </table>
         </div>
       </div>
+
+      {/* Pratinjau / cetak invoice */}
+      <Modal open={!!printData || loadingPrint} onClose={() => setPrintData(null)} title="Invoice" size="xl">
+        {loadingPrint || !printData ? (
+          <div className="py-16 text-center text-slate-400"><Loader2 className="w-6 h-6 animate-spin mx-auto" /></div>
+        ) : (
+          <DocumentPrintView data={printData} onClose={() => setPrintData(null)} />
+        )}
+      </Modal>
     </AppShell>
   )
 }

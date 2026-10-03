@@ -1,10 +1,12 @@
 'use client'
 
 import AppShell from '@/components/app-shell'
+import { Modal } from '@/components/ui/modal'
+import { DocumentPrintView, type DocumentPrintData } from '@/components/document-print'
 import { useSession } from '@/hooks/use-session'
 import { useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabase/client'
-import { Search, ArrowDownToLine, Loader2, Package } from 'lucide-react'
+import { Search, ArrowDownToLine, Loader2, Package, Printer } from 'lucide-react'
 
 type GR = {
   id: string
@@ -15,11 +17,21 @@ type GR = {
   profiles: { full_name: string } | null
 }
 
+type GRLine = {
+  batch_number: string | null
+  quantity_kg: number
+  quantity_received: number
+  condition: string
+  products: { name: string; sku: string | null } | null
+}
+
 export default function GoodsReceiptsPage() {
   const { roleName, loaded, organizationId } = useSession()
   const [data, setData] = useState<GR[]>([])
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
+  const [printData, setPrintData] = useState<DocumentPrintData | null>(null)
+  const [loadingPrint, setLoadingPrint] = useState(false)
   
 
   useEffect(() => {
@@ -37,6 +49,38 @@ export default function GoodsReceiptsPage() {
       .limit(100)
     setData((rows as GR[]) || [])
     setLoading(false)
+  }
+
+  async function openPrint(row: GR) {
+    setLoadingPrint(true)
+    setPrintData(null)
+    const { data: lineRows } = await supabase
+      .from('goods_receipt_lines')
+      .select('batch_number, quantity_kg, quantity_received, condition, products(name, sku)')
+      .eq('gr_id', row.id)
+    const lines = (lineRows as GRLine[] | null) || []
+
+    setPrintData({
+      docType: 'Penerimaan Barang',
+      docNumber: row.gr_number,
+      date: row.received_at,
+      status: null,
+      meta: [
+        { label: 'PO Ref.', value: row.purchase_orders?.po_number ?? '-' },
+        { label: 'Diterima Oleh', value: row.profiles?.full_name ?? '-' },
+        { label: 'Tanggal', value: new Date(row.received_at).toLocaleDateString('id-ID') },
+      ],
+      lines: lines.map((l) => ({
+        name: l.products?.name ?? '-',
+        sku: l.products?.sku,
+        batch: l.batch_number,
+        quantity: l.quantity_received || l.quantity_kg,
+        unit: 'kg',
+      })),
+      notes: row.notes,
+      signatures: ['Diterima Warehouse', 'Diserahkan Supplier'],
+    })
+    setLoadingPrint(false)
   }
 
   const filtered = data.filter((r) => {
@@ -71,13 +115,14 @@ export default function GoodsReceiptsPage() {
                 <th className="text-left px-4 py-3 font-semibold text-slate-600">Diterima Oleh</th>
                 <th className="text-left px-4 py-3 font-semibold text-slate-600">Catatan</th>
                 <th className="text-right px-4 py-3 font-semibold text-slate-600">Tanggal</th>
+                <th className="text-center px-4 py-3 font-semibold text-slate-600">Aksi</th>
               </tr>
             </thead>
             <tbody>
               {loading ? (
-                <tr><td colSpan={5} className="text-center py-12 text-slate-400"><Loader2 className="w-6 h-6 animate-spin mx-auto" /></td></tr>
+                <tr><td colSpan={6} className="text-center py-12 text-slate-400"><Loader2 className="w-6 h-6 animate-spin mx-auto" /></td></tr>
               ) : filtered.length === 0 ? (
-                <tr><td colSpan={5} className="text-center py-12 text-slate-400"><Package className="w-8 h-8 mx-auto mb-2 opacity-30" /><p>Belum ada goods receipt</p></td></tr>
+                <tr><td colSpan={6} className="text-center py-12 text-slate-400"><Package className="w-8 h-8 mx-auto mb-2 opacity-30" /><p>Belum ada goods receipt</p></td></tr>
               ) : (
                 filtered.map((row) => (
                   <tr key={row.id} className="border-b border-slate-100 hover:bg-slate-50 transition-colors">
@@ -86,6 +131,11 @@ export default function GoodsReceiptsPage() {
                     <td className="px-4 py-3 text-slate-600">{row.profiles?.full_name ?? '-'}</td>
                     <td className="px-4 py-3 text-slate-500 text-xs">{row.notes ?? '-'}</td>
                     <td className="px-4 py-3 text-right text-slate-500 text-xs">{new Date(row.received_at).toLocaleDateString('id-ID')}</td>
+                    <td className="px-4 py-3 text-center">
+                      <button onClick={() => openPrint(row)} className="inline-flex items-center gap-1 px-3 py-1.5 text-xs font-medium text-primary border border-primary/30 rounded-lg hover:bg-primary/5 transition-colors">
+                        <Printer className="w-3.5 h-3.5" /> Cetak
+                      </button>
+                    </td>
                   </tr>
                 ))
               )}
@@ -93,6 +143,15 @@ export default function GoodsReceiptsPage() {
           </table>
         </div>
       </div>
+
+      {/* Pratinjau / cetak goods receipt */}
+      <Modal open={!!printData || loadingPrint} onClose={() => setPrintData(null)} title="Penerimaan Barang" size="xl">
+        {loadingPrint || !printData ? (
+          <div className="py-16 text-center text-slate-400"><Loader2 className="w-6 h-6 animate-spin mx-auto" /></div>
+        ) : (
+          <DocumentPrintView data={printData} onClose={() => setPrintData(null)} />
+        )}
+      </Modal>
     </AppShell>
   )
 }

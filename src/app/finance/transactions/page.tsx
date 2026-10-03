@@ -1,11 +1,13 @@
 'use client'
 
 import AppShell from '@/components/app-shell'
+import { Modal } from '@/components/ui/modal'
+import { DocumentPrintView, type DocumentPrintData } from '@/components/document-print'
 import { useSession } from '@/hooks/use-session'
 import { useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabase/client'
 import { formatCurrency, formatDate } from '@/lib/utils'
-import { Search, DollarSign, Loader2, X, Plus, Trash2, Pencil } from 'lucide-react'
+import { Search, DollarSign, Loader2, X, Plus, Trash2, Pencil, Printer } from 'lucide-react'
 
 type Transaction = {
   id: string
@@ -28,6 +30,8 @@ export default function FinanceTransactionsPage() {
   const [showForm, setShowForm] = useState(false)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [printData, setPrintData] = useState<DocumentPrintData | null>(null)
+  const [loadingPrint, setLoadingPrint] = useState(false)
   const [form, setForm] = useState({
     description: '',
     amount: '',
@@ -103,6 +107,60 @@ export default function FinanceTransactionsPage() {
   const totalDebit = data.filter((r) => r.type === 'DEBIT').reduce((sum, r) => sum + Number(r.amount), 0)
   const totalCredit = data.filter((r) => r.type === 'CREDIT').reduce((sum, r) => sum + Number(r.amount), 0)
 
+  function openPrintReport() {
+    const today = new Date().toISOString().split('T')[0]
+    setLoadingPrint(true)
+    setPrintData(null)
+    setPrintData({
+      docType: 'Laporan',
+      docNumber: `LAP-TRX-${today}`,
+      date: today,
+      status: null,
+      meta: [
+        { label: 'Jumlah Data', value: String(filtered.length) },
+        { label: 'Total Debit', value: formatCurrency(totalDebit) },
+        { label: 'Total Kredit', value: formatCurrency(totalCredit) },
+      ],
+      lines: filtered.map((r) => ({
+        name: `${formatDate(r.transaction_date)} — ${r.description} (${r.type === 'CREDIT' ? 'Kredit' : 'Debit'})`,
+        quantity: r.amount,
+        unit: 'Rp',
+      })),
+      totals: [
+        { label: 'Total Debit', value: totalDebit },
+        { label: 'Total Kredit', value: totalCredit },
+      ],
+      signatures: ['Dibuat Oleh', 'Disetujui'],
+    })
+    setLoadingPrint(false)
+  }
+
+  function openPrintRow(row: Transaction) {
+    setLoadingPrint(true)
+    setPrintData(null)
+    setPrintData({
+      docType: 'Bukti Transaksi',
+      docNumber: `TRX-${row.id.slice(0, 8)}`,
+      date: row.transaction_date,
+      status: row.type === 'CREDIT' ? 'Kredit' : 'Debit',
+      meta: [
+        { label: 'Tipe', value: row.type === 'CREDIT' ? 'Kredit (Pemasukan)' : 'Debit (Pengeluaran)' },
+        { label: 'Referensi', value: row.reference_type ? `${row.reference_type}#${row.reference_id?.slice(0, 8)}` : '-' },
+        { label: 'Oleh', value: row.profiles?.full_name ?? '-' },
+      ],
+      lines: [
+        {
+          name: row.description,
+          quantity: row.amount,
+          unit: 'Rp',
+        },
+      ],
+      totals: [{ label: 'Jumlah', value: row.amount }],
+      signatures: ['Dibuat Oleh', 'Diterima Oleh'],
+    })
+    setLoadingPrint(false)
+  }
+
   return (
     <AppShell>
       <div className="p-6 lg:p-8 max-w-7xl mx-auto">
@@ -118,12 +176,20 @@ export default function FinanceTransactionsPage() {
               Total Debit: {formatCurrency(totalDebit)} | Total Kredit: {formatCurrency(totalCredit)}
             </p>
           </div>
-          <button
-            onClick={() => setShowForm(true)}
-            className="flex items-center gap-2 px-4 py-2 bg-primary hover:bg-primary/90 text-white text-sm font-medium rounded-lg transition-colors"
-          >
-            <Plus className="w-4 h-4" /> <span>Baru</span>
-          </button>
+          <div className="flex items-center gap-3">
+            <button
+              onClick={openPrintReport}
+              className="flex items-center gap-2 px-4 py-2 bg-white border border-line text-ink text-sm font-medium rounded-lg hover:bg-slate-50 transition-colors"
+            >
+              <Printer className="w-4 h-4" /> <span>Cetak Laporan</span>
+            </button>
+            <button
+              onClick={() => setShowForm(true)}
+              className="flex items-center gap-2 px-4 py-2 bg-primary hover:bg-primary/90 text-white text-sm font-medium rounded-lg transition-colors"
+            >
+              <Plus className="w-4 h-4" /> <span>Baru</span>
+            </button>
+          </div>
         </div>
 
         {error && <div className="p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700 mb-4">{error}</div>}
@@ -224,18 +290,19 @@ export default function FinanceTransactionsPage() {
                 <th className="text-right px-4 py-3 font-semibold text-slate-600">Jumlah</th>
                 <th className="text-left px-4 py-3 font-semibold text-slate-600">Ref</th>
                 <th className="text-left px-4 py-3 font-semibold text-slate-600">Oleh</th>
+                <th className="text-center px-4 py-3 font-semibold text-slate-600">Aksi</th>
               </tr>
             </thead>
             <tbody>
               {loading ? (
                 <tr>
-                  <td colSpan={6} className="text-center py-12 text-slate-400">
+                  <td colSpan={7} className="text-center py-12 text-slate-400">
                     <Loader2 className="w-6 h-6 animate-spin mx-auto" />
                   </td>
                 </tr>
               ) : filtered.length === 0 ? (
                 <tr>
-                  <td colSpan={6} className="text-center py-12 text-slate-400">
+                  <td colSpan={7} className="text-center py-12 text-slate-400">
                     <DollarSign className="w-8 h-8 mx-auto mb-2 opacity-30" />
                     <p>Belum ada transaksi</p>
                   </td>
@@ -265,6 +332,15 @@ export default function FinanceTransactionsPage() {
                       {row.reference_type ? `${row.reference_type}#${row.reference_id?.slice(0, 8)}` : '-'}
                     </td>
                     <td className="px-4 py-3 text-slate-600 text-xs">{row.profiles?.full_name ?? '-'}</td>
+                    <td className="px-4 py-3 text-center">
+                      <button
+                        onClick={() => openPrintRow(row)}
+                        className="p-2 rounded-lg text-slate-400 hover:text-primary hover:bg-primary/5 transition-colors"
+                        title="Cetak"
+                      >
+                        <Printer className="w-4 h-4" />
+                      </button>
+                    </td>
                   </tr>
                 ))
               )}
@@ -272,6 +348,15 @@ export default function FinanceTransactionsPage() {
           </table>
         </div>
       </div>
+
+      {/* Pratinjau / cetak laporan transaksi */}
+      <Modal open={!!printData || loadingPrint} onClose={() => setPrintData(null)} title="Laporan" size="xl">
+        {loadingPrint || !printData ? (
+          <div className="py-16 text-center text-slate-400"><Loader2 className="w-6 h-6 animate-spin mx-auto" /></div>
+        ) : (
+          <DocumentPrintView data={printData} onClose={() => setPrintData(null)} />
+        )}
+      </Modal>
     </AppShell>
   )
 }

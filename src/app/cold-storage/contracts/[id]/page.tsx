@@ -2,12 +2,14 @@
 
 import AppShell from '@/components/app-shell'
 import { StatusBadge } from '@/components/ui/status-badge'
+import { Modal } from '@/components/ui/modal'
+import { DocumentPrintView, type DocumentPrintData } from '@/components/document-print'
 import { useSession } from '@/hooks/use-session'
 import { useEffect, useState, useCallback } from 'react'
 import { supabase } from '@/lib/supabase/client'
 import Link from 'next/link'
 import { useParams } from 'next/navigation'
-import { ArrowLeft, Plus, RefreshCw, Package, PackageMinus, FileText, Loader2, AlertTriangle } from 'lucide-react'
+import { ArrowLeft, Plus, RefreshCw, Package, PackageMinus, FileText, Loader2, AlertTriangle, Printer } from 'lucide-react'
 
 type Contract = {
   id: string
@@ -60,6 +62,9 @@ export default function ContractDetailPage() {
   const [billing, setBilling] = useState<Billing | null>(null)
   const [loading, setLoading] = useState(true)
   const [recalculating, setRecalculating] = useState(false)
+
+  const [printData, setPrintData] = useState<DocumentPrintData | null>(null)
+  const [loadingPrint, setLoadingPrint] = useState(false)
 
   const [recvKg, setRecvKg] = useState('')
   const [recvBatch, setRecvBatch] = useState('')
@@ -191,6 +196,36 @@ export default function ContractDetailPage() {
     await fetchData()
   }
 
+  function openPrint() {
+    if (!contract) return
+    setLoadingPrint(true)
+    setPrintData(null)
+    setPrintData({
+      docType: 'Kontrak Rental',
+      docNumber: contract.contract_number,
+      date: contract.start_date,
+      status: contract.status,
+      meta: [
+        { label: 'Customer', value: contract.rental_customers?.name ?? '-' },
+        { label: 'Cold Storage', value: contract.cold_storages?.name ?? '-' },
+        { label: 'Periode', value: `${new Date(contract.start_date).toLocaleDateString('id-ID')} - ${new Date(contract.end_date).toLocaleDateString('id-ID')}` },
+        { label: 'Tarif per Kg/Hari', value: `Rp ${Number(contract.price_per_kg_per_day).toLocaleString('id-ID')}` },
+      ],
+      lines: [
+        {
+          name: 'Estimasi Kapasitas Rental',
+          quantity: contract.total_estimated_kg,
+          unit: 'kg',
+          price: contract.price_per_kg_per_day,
+        },
+      ],
+      totals: [{ label: 'Total Estimasi Kg', value: `${Number(contract.total_estimated_kg).toLocaleString('id-ID')} kg` }],
+      notes: contract.notes,
+      signatures: ['Pihak Penyewa', 'Pihak Cold Storage'],
+    })
+    setLoadingPrint(false)
+  }
+
   if (loading) {
     return (
       <AppShell>
@@ -227,6 +262,13 @@ export default function ContractDetailPage() {
             </div>
           </div>
           <div className="flex items-center gap-3">
+            <button
+              onClick={openPrint}
+              className="flex items-center gap-2 px-4 py-2 bg-white border border-line text-ink text-sm font-medium rounded-lg hover:bg-slate-50 transition-colors"
+            >
+              <Printer className="w-4 h-4" />
+              <span>Cetak Kontrak</span>
+            </button>
             <button
               onClick={recalculateBilling}
               disabled={recalculating}
@@ -378,6 +420,15 @@ export default function ContractDetailPage() {
           </div>
         </div>
       </div>
+
+      {/* Pratinjau / cetak kontrak */}
+      <Modal open={!!printData || loadingPrint} onClose={() => setPrintData(null)} title="Kontrak Rental" size="xl">
+        {loadingPrint || !printData ? (
+          <div className="py-16 text-center text-slate-400"><Loader2 className="w-6 h-6 animate-spin mx-auto" /></div>
+        ) : (
+          <DocumentPrintView data={printData} onClose={() => setPrintData(null)} />
+        )}
+      </Modal>
     </AppShell>
   )
 }
