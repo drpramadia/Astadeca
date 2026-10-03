@@ -1,7 +1,9 @@
 'use client'
 
 import AppShell from '@/components/app-shell'
+import { AccessDenied } from '@/components/access-denied'
 import { useSession } from '@/hooks/use-session'
+import { useRoleGuard } from '@/hooks/use-role-guard'
 import { useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabase/client'
 import { exportToCsv, parseCsv } from '@/lib/csv'
@@ -30,6 +32,7 @@ const CSV_COLUMNS = [
 
 export default function ProductsPage() {
   const { organizationId, loaded } = useSession()
+  const { denied } = useRoleGuard(['ADMIN', 'DIRECTOR', 'WAREHOUSE'])
   const [data, setData] = useState<Product[]>([])
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
@@ -190,6 +193,8 @@ export default function ProductsPage() {
     }
     reader.readAsText(file, 'UTF-8')
   }
+
+  if (denied) return <AccessDenied message="Data master hanya untuk Admin atau Director." />
 
   return (
     <AppShell>

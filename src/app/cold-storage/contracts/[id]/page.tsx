@@ -5,6 +5,8 @@ import { StatusBadge } from '@/components/ui/status-badge'
 import { Modal } from '@/components/ui/modal'
 import { DocumentPrintView, type DocumentPrintData } from '@/components/document-print'
 import { useSession } from '@/hooks/use-session'
+import { useRoleGuard } from '@/hooks/use-role-guard'
+import { AccessDenied } from '@/components/access-denied'
 import { useEffect, useState, useCallback } from 'react'
 import { supabase } from '@/lib/supabase/client'
 import Link from 'next/link'
@@ -53,6 +55,7 @@ type Billing = {
 
 export default function ContractDetailPage() {
   const { loaded, organizationId, userId } = useSession()
+  const { denied } = useRoleGuard(['ADMIN', 'DIRECTOR', 'WAREHOUSE'])
   const params = useParams<{ id: string }>()
   const contractId = params.id
 
@@ -271,6 +274,8 @@ export default function ContractDetailPage() {
   const totalReceived = receivings.reduce((s, r) => s + Number(r.received_kg), 0)
   const totalReleased = releases.reduce((s, r) => s + Number(r.released_kg), 0)
   const currentKg = totalReceived - totalReleased
+
+  if (denied) return <AccessDenied message="Detail kontrak hanya untuk Admin, Director, atau Warehouse." />
 
   return (
     <AppShell>

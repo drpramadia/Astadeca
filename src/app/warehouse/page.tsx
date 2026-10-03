@@ -1,6 +1,8 @@
 'use client'
 
 import AppShell from '@/components/app-shell'
+import { AccessDenied } from '@/components/access-denied'
+import { useRoleGuard } from '@/hooks/use-role-guard'
 import Link from 'next/link'
 import {
   Warehouse,
@@ -39,6 +41,8 @@ function ModuleCard({
 }
 
 export default function WarehousePage() {
+  const { denied } = useRoleGuard(['ADMIN', 'DIRECTOR', 'WAREHOUSE'])
+  if (denied) return <AccessDenied message="Halaman Warehouse hanya untuk Admin, Director, atau Warehouse." />
   return (
     <AppShell>
       <div className="p-6 lg:p-8 max-w-5xl mx-auto">
