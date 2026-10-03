@@ -4,11 +4,13 @@ import AppShell from '@/components/app-shell'
 import { useSession } from '@/hooks/use-session'
 import { useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabase/client'
+import { formatDate } from '@/lib/utils'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { Loader2, X, Plus } from 'lucide-react'
 import { useForm, useFieldArray } from 'react-hook-form'
 import { useRentalSettings } from '@/hooks/use-rental-settings'
+import { computeEndDate } from '@/lib/rental-dates'
 
 type Customer = { id: string; name: string }
 type ColdStorage = { id: string; name: string }
@@ -18,7 +20,7 @@ interface ContractFormData {
   customer_id: string
   cold_storage_id: string
   start_date: string
-  end_date: string
+  duration_days: string
   total_estimated_kg: string
   price_per_kg_per_day: string
   notes: string
@@ -37,9 +39,19 @@ export default function NewContractPage() {
   const [error, setError] = useState<string | null>(null)
 
   const { register, handleSubmit, watch, setValue, control, formState: { errors } } = useForm<ContractFormData>({
-    defaultValues: { customer_id: '', cold_storage_id: '', start_date: '', end_date: '', total_estimated_kg: '', notes: '', items: [{ basket_id: '', allocated_kg: '' }] }
+    defaultValues: {
+      customer_id: '', cold_storage_id: '',
+      start_date: new Date().toISOString().slice(0, 10),
+      duration_days: '90',
+      total_estimated_kg: '', notes: '', items: [{ basket_id: '', allocated_kg: '' }]
+    }
   })
   const { fields, append, remove } = useFieldArray({ control, name: 'items' })
+
+  // Tanggal selesai otomatis dari tanggal mulai + jangka waktu
+  const startDate = watch('start_date')
+  const durationDays = watch('duration_days')
+  const endDate = computeEndDate(startDate, parseInt(durationDays) || 0)
 
   // Isi tarif default dari pengaturan global
   useEffect(() => {
@@ -83,7 +95,7 @@ export default function NewContractPage() {
       cold_storage_id: form.cold_storage_id || null,
       contract_number: contractNumber,
       start_date: form.start_date,
-      end_date: form.end_date,
+      end_date: computeEndDate(form.start_date, parseInt(form.duration_days) || 0) || null,
       price_per_kg_per_day: parseFloat(form.price_per_kg_per_day) || 0,
       total_estimated_kg: parseFloat(form.total_estimated_kg) || 0,
       notes: form.notes || null,
@@ -167,19 +179,27 @@ export default function NewContractPage() {
                 {errors.start_date && <p className="text-xs text-red-500 mt-1">{errors.start_date.message as string}</p>}
               </div>
               <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1">Tgl Selesai *</label>
-                <input type="date" {...register('end_date', { required: 'Wajib diisi' })} className="w-full border border-slate-200 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary" />
-                {errors.end_date && <p className="text-xs text-red-500 mt-1">{errors.end_date.message as string}</p>}
+                <label className="block text-sm font-medium text-slate-700 mb-1">Jangka Waktu (hari) *</label>
+                <input type="number" min={1} {...register('duration_days', { required: 'Wajib diisi', min: { value: 1, message: 'Minimal 1 hari' } })} placeholder="mis. 90" className="w-full border border-slate-200 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary" />
+                {errors.duration_days && <p className="text-xs text-red-500 mt-1">{errors.duration_days.message as string}</p>}
               </div>
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1">Tgl Selesai (otomatis)</label>
+                <div className="w-full border border-slate-200 rounded-lg px-3 py-2.5 text-sm bg-slate-50 text-slate-600">
+                  {endDate ? formatDate(endDate) : '—'}
+                </div>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
                 <label className="block text-sm font-medium text-slate-700 mb-1">Estimasi Kg</label>
                 <input type="number" step="0.01" {...register('total_estimated_kg')} placeholder="0" className="w-full border border-slate-200 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary" />
               </div>
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1">Tarif per Kg/Hari (Rp)</label>
-              <input type="number" step="0.01" {...register('price_per_kg_per_day')} placeholder="0" className="w-full border border-slate-200 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary" />
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1">Tarif per Kg/Hari (Rp)</label>
+                <input type="number" step="0.01" {...register('price_per_kg_per_day')} placeholder="0" className="w-full border border-slate-200 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary" />
+              </div>
             </div>
 
             <div>
