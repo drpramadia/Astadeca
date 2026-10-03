@@ -67,12 +67,15 @@ export default function BillingPage() {
     if (!contractId) { setIssueError('Pilih kontrak dulu.'); return }
     setIssuing(true)
     setIssueError(null)
-    const { error } = await supabase.rpc('calculate_rental_billing', { p_contract_id: contractId })
+    const { data, error } = await supabase.rpc('calculate_rental_billing', { p_contract_id: contractId })
     setIssuing(false)
     if (error) { setIssueError(error.message); return }
+    const row = Array.isArray(data) ? data[0] : data
+    const invNum = (row as { out_invoice_number?: string } | null)?.out_invoice_number
     setShowIssue(false)
     setContractId('')
-    fetchData()
+    await fetchData()
+    if (invNum) alert(`Invoice ${invNum} berhasil diterbitkan.`)
   }
 
   async function fetchData() {

@@ -282,9 +282,6 @@ export function GlobalSearch() {
       >
         <Search className="w-4 h-4" />
         <span className="text-sm flex-1 text-left">Cari kontrak, invoice, barang, basket...</span>
-        <kbd className="flex items-center gap-0.5 px-1.5 py-0.5 rounded border border-slate-200 bg-white text-[10px] text-slate-500">
-          <Command className="w-2.5 h-2.5" />K
-        </kbd>
       </button>
 
       {/* Tombol pembuka (mobile) */}

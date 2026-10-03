@@ -129,6 +129,7 @@ export default function DashboardPage() {
     pendingPayment: 0,
   })
   const [loading, setLoading] = useState(true)
+  const [activities, setActivities] = useState<{ id: string; type: string; label: string; time: string }[]>([])
 
   useEffect(() => {
     if (loaded && !userId) {
@@ -139,7 +140,25 @@ export default function DashboardPage() {
   useEffect(() => {
     if (!loaded || !userId || !organizationId) return
     loadStats()
+    loadActivities()
   }, [loaded, userId, organizationId])
+
+  async function loadActivities() {
+    const { data } = await supabase
+      .from('inventory_movements')
+      .select('id, movement_type, quantity_kg, performed_at, products(name)')
+      .eq('organization_id', organizationId)
+      .order('performed_at', { ascending: false })
+      .limit(6)
+    setActivities(
+      ((data as unknown as { id: string; movement_type: string; quantity_kg: number; performed_at: string; products: { name: string } | null }[]) || []).map((m) => ({
+        id: m.id,
+        type: m.movement_type,
+        label: `${m.movement_type === 'IN' ? 'Masuk' : 'Keluar'} ${Number(m.quantity_kg).toLocaleString('id-ID')} kg — ${m.products?.name ?? '-'}`,
+        time: new Date(m.performed_at).toLocaleString('id-ID', { dateStyle: 'medium', timeStyle: 'short' }),
+      }))
+    )
+  }
 
   async function loadStats() {
     setLoading(true)
@@ -409,15 +428,27 @@ export default function DashboardPage() {
               </div>
             )}
 
-            {/* Recent Activity placeholder */}
+            {/* Recent Activity */}
             <div className="bg-white rounded-xl border border-slate-200 p-5">
               <div className="flex items-center gap-2 mb-4">
                 <Activity className="w-4 h-4 text-slate-400" />
                 <h3 className="text-sm font-semibold text-slate-800">Aktivitas Terakhir</h3>
               </div>
-              <p className="text-sm text-slate-400 text-center py-4">
-                Fitur aktivitas terakhir akan segera hadir.
-              </p>
+              {activities.length === 0 ? (
+                <p className="text-sm text-slate-400 text-center py-4">Belum ada aktivitas.</p>
+              ) : (
+                <div className="space-y-3">
+                  {activities.map((a) => (
+                    <div key={a.id} className="flex items-start gap-3">
+                      <span className={`mt-1 w-2 h-2 rounded-full flex-shrink-0 ${a.type === 'IN' ? 'bg-green-500' : a.type === 'OUT' ? 'bg-amber-500' : 'bg-slate-400'}`} />
+                      <div className="min-w-0 flex-1">
+                        <p className="text-xs text-slate-700 truncate">{a.label}</p>
+                        <p className="text-[11px] text-slate-400">{a.time}</p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
           </div>
         </div>

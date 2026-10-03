@@ -4,7 +4,8 @@ import { useState, useRef, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabase/client'
 import { useSession } from '@/hooks/use-session'
-import { ChevronDown, LogOut, ShieldCheck, User, KeyRound } from 'lucide-react'
+import { useTheme, type ThemeMode } from '@/hooks/use-theme'
+import { ChevronDown, LogOut, ShieldCheck, User, KeyRound, Sun, Moon, MonitorSmartphone } from 'lucide-react'
 
 function initials(name: string | null): string {
   if (!name) return '?'
@@ -13,8 +14,15 @@ function initials(name: string | null): string {
   return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase()
 }
 
+const THEME_OPTIONS: { value: ThemeMode; label: string; icon: React.ElementType }[] = [
+  { value: 'light', label: 'Terang', icon: Sun },
+  { value: 'dark', label: 'Gelap', icon: Moon },
+  { value: 'auto', label: 'Otomatis', icon: MonitorSmartphone },
+]
+
 export default function UserMenu() {
   const { name, username, email, roleName, roleCode, loaded } = useSession()
+  const { mode, setMode } = useTheme()
   const router = useRouter()
   const [open, setOpen] = useState(false)
   const ref = useRef<HTMLDivElement>(null)
@@ -75,6 +83,28 @@ export default function UserMenu() {
                 <ShieldCheck className="w-3.5 h-3.5" />
                 <span>{roleLabel}</span>
               </div>
+            </div>
+          </div>
+          {/* Tema */}
+          <div className="px-4 py-3 border-t border-slate-100">
+            <p className="text-xs font-medium text-slate-500 mb-2">Tema</p>
+            <div className="grid grid-cols-3 gap-1.5">
+              {THEME_OPTIONS.map((opt) => {
+                const Icon = opt.icon
+                const active = mode === opt.value
+                return (
+                  <button
+                    key={opt.value}
+                    onClick={() => setMode(opt.value)}
+                    className={`flex flex-col items-center gap-1 py-2 rounded-lg text-[11px] font-medium border transition-colors ${
+                      active ? 'bg-primary text-white border-primary' : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50'
+                    }`}
+                  >
+                    <Icon className="w-4 h-4" />
+                    {opt.label}
+                  </button>
+                )
+              })}
             </div>
           </div>
           <button

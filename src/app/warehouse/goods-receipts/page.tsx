@@ -6,7 +6,7 @@ import { DocumentPrintView, type DocumentPrintData } from '@/components/document
 import { useSession } from '@/hooks/use-session'
 import { useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabase/client'
-import { Search, Loader2, Package, Printer, Plus, X } from 'lucide-react'
+import { Search, Loader2, Package, Printer, Plus, X, Trash2 } from 'lucide-react'
 
 type GR = {
   id: string
@@ -63,6 +63,7 @@ export default function GoodsReceiptsPage() {
   const [recvLines, setRecvLines] = useState<ReceiveLine[]>([])
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [products, setProducts] = useState<{ id: string; name: string; sku: string | null }[]>([])
 
   const canReceive = (roleCode as RoleCode) === 'WAREHOUSE' || (roleCode as RoleCode) === 'SYSTEM_ADMIN'
 
@@ -73,9 +74,19 @@ export default function GoodsReceiptsPage() {
   }, [loaded])
 
   useEffect(() => {
-    if (showForm) loadApprovedPOs()
+    if (showForm) { loadApprovedPOs(); loadProducts() }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [showForm])
+
+  async function loadProducts() {
+    const { data: rows } = await supabase
+      .from('products')
+      .select('id, name, sku')
+      .eq('organization_id', organizationId)
+      .order('name')
+      .limit(500)
+    setProducts(rows || [])
+  }
 
   async function fetchData() {
     setLoading(true)
@@ -130,11 +141,24 @@ export default function GoodsReceiptsPage() {
     setRecvLines((prev) => prev.map((l, i) => (i === idx ? { ...l, ...patch } : l)))
   }
 
+  function addLine() {
+    setRecvLines((prev) => [...prev, { product_id: '', name: '', batch_number: '', quantity_kg: '', condition: 'GOOD' }])
+  }
+
+  function removeLine(idx: number) {
+    setRecvLines((prev) => prev.filter((_, i) => i !== idx))
+  }
+
+  function setLineProduct(idx: number, productId: string) {
+    const p = products.find((x) => x.id === productId)
+    updateLine(idx, { product_id: productId, name: p?.name ?? '' })
+  }
+
   async function handleReceive(e: React.FormEvent) {
     e.preventDefault()
     if (!poId) { setError('Pilih PO dulu.'); return }
-    const valid = recvLines.filter((l) => parseFloat(l.quantity_kg) > 0)
-    if (valid.length === 0) { setError('Minimal 1 item dengan jumlah > 0.'); return }
+    const valid = recvLines.filter((l) => l.product_id && parseFloat(l.quantity_kg) > 0)
+    if (valid.length === 0) { setError('Minimal 1 item dengan barang & jumlah > 0.'); return }
 
     setSaving(true)
     setError(null)
@@ -304,20 +328,38 @@ export default function GoodsReceiptsPage() {
             </div>
           </div>
 
-          {recvLines.length > 0 && (
+          {poId && (
             <div className="border-t border-slate-200 pt-4">
-              <p className="text-sm font-semibold text-slate-700 mb-3">Item Diterima</p>
+              <div className="flex items-center justify-between mb-3">
+                <p className="text-sm font-semibold text-slate-700">Item Diterima</p>
+                <button type="button" onClick={addLine} className="flex items-center gap-1 text-sm text-primary hover:underline">
+                  <Plus className="w-4 h-4" /> Tambah Barang
+                </button>
+              </div>
+              {recvLines.length === 0 && (
+                <p className="text-xs text-slate-400">Belum ada item. Klik &quot;Tambah Barang&quot; untuk menambahkan barang yang diterima (termasuk yang belum tercatat di PO).</p>
+              )}
               <div className="space-y-2">
                 {recvLines.map((l, idx) => (
                   <div key={idx} className="grid grid-cols-12 gap-2 items-center bg-slate-50 rounded-lg p-3">
-                    <span className="col-span-12 sm:col-span-4 text-sm text-slate-700">{l.name}</span>
+                    <select
+                      className="col-span-12 sm:col-span-4 border border-slate-200 rounded-lg px-3 py-2 text-sm"
+                      value={l.product_id}
+                      onChange={(e) => setLineProduct(idx, e.target.value)}
+                    >
+                      <option value="">-- Pilih barang --</option>
+                      {products.map((p) => <option key={p.id} value={p.id}>{p.name}{p.sku ? ` (${p.sku})` : ''}</option>)}
+                    </select>
                     <input className="col-span-6 sm:col-span-3 border border-slate-200 rounded-lg px-3 py-2 text-sm" placeholder="Batch" value={l.batch_number} onChange={(e) => updateLine(idx, { batch_number: e.target.value })} />
                     <input className="col-span-6 sm:col-span-2 border border-slate-200 rounded-lg px-3 py-2 text-sm" type="number" step="0.01" placeholder="Qty kg" value={l.quantity_kg} onChange={(e) => updateLine(idx, { quantity_kg: e.target.value })} />
-                    <select className="col-span-12 sm:col-span-3 border border-slate-200 rounded-lg px-3 py-2 text-sm" value={l.condition} onChange={(e) => updateLine(idx, { condition: e.target.value })}>
+                    <select className="col-span-10 sm:col-span-2 border border-slate-200 rounded-lg px-3 py-2 text-sm" value={l.condition} onChange={(e) => updateLine(idx, { condition: e.target.value })}>
                       <option value="GOOD">Baik</option>
                       <option value="DAMAGED">Rusak</option>
                       <option value="REJECTED">Ditolak</option>
                     </select>
+                    <button type="button" onClick={() => removeLine(idx)} className="col-span-2 sm:col-span-1 flex items-center justify-center text-red-500 hover:bg-red-50 rounded-lg py-2">
+                      <Trash2 className="w-4 h-4" />
+                    </button>
                   </div>
                 ))}
               </div>

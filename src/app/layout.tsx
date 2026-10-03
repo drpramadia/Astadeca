@@ -33,6 +33,14 @@ export default function RootLayout({
 }) {
   return (
     <html lang="id" className={`${dmSans.variable} ${pjsDisplay.variable}`}>
+      <head>
+        {/* Terapkan tema sebelum render untuk mencegah kedipan */}
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `(function(){try{var m=localStorage.getItem('astadeca.theme')||'auto';var e=m;if(m==='auto'){var h=new Date().getHours();e=(h>=18||h<6)?'dark':'light';}if(e==='dark')document.documentElement.classList.add('dark');document.documentElement.dataset.theme=e;}catch(_){}})();`,
+          }}
+        />
+      </head>
       <body className="font-sans antialiased">
         <SessionProvider>{children}</SessionProvider>
       </body>
