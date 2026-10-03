@@ -3,8 +3,8 @@
 // Reads Supabase URL + service role key from .env.local (never logs secrets).
 //
 // Users:
-//   - siswoko / siswoastadeca   (WAREHOUSE + QC)
-//   - syaiful / epulastadeca    (WAREHOUSE + QC)
+//   - siswoko   (WAREHOUSE + QC)  — password dari env WAREHOUSE_SISWOKO_PASSWORD
+//   - syaiful   (WAREHOUSE + QC)  — password dari env WAREHOUSE_SYAIFUL_PASSWORD
 //
 // Email is a temporary placeholder; update it later via Settings > Users.
 
@@ -103,14 +103,14 @@ async function upsertUser({ email, password, username, full_name }) {
 async function main() {
   await upsertUser({
     email: 'siswoko@astadeca.local',
-    password: 'siswoastadeca',
+    password: env.WAREHOUSE_SISWOKO_PASSWORD,
     username: 'siswoko',
     full_name: 'Siswoko',
   })
 
   await upsertUser({
     email: 'syaiful@astadeca.local',
-    password: 'epulastadeca',
+    password: env.WAREHOUSE_SYAIFUL_PASSWORD,
     username: 'syaiful',
     full_name: 'Syaiful',
   })

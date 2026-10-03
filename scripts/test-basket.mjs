@@ -1,20 +1,11 @@
 /**
  * Uji flow basket: assign inventory ke basket, verifikasi join, lalu rollback.
  */
-import pg from 'pg'
-import fs from 'node:fs'
+import { connect } from './db-config.mjs'
 
-const raw = fs.readFileSync('.env.local', 'utf8')
-const password = (raw.match(/password database[^=]*=\s*(\S+)/i) || [])[1]
-
-const client = new pg.Client({
-  host: 'aws-0-ap-southeast-1.pooler.supabase.com', port: 5432,
-  user: 'postgres.huaggvlpknwzarpgjkso', password, database: 'postgres',
-  ssl: { rejectUnauthorized: false },
-})
+const client = await connect()
 const ORG = '20000000-0000-0000-0000-000000000001'
 
-await client.connect()
 const results = []
 function check(n, ok, d = '') { results.push({ n, ok: !!ok }); console.log(`${ok ? 'PASS' : 'FAIL'}  ${n}${d ? ' — ' + d : ''}`) }
 

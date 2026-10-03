@@ -3,27 +3,14 @@
  * Menggunakan prefix 'E2E-SEED' agar mudah dihapus nanti.
  * Jalankan: node scripts/seed-demo.mjs
  */
-import pg from 'pg'
-import fs from 'node:fs'
+import { connect } from './db-config.mjs'
 
-const raw = fs.readFileSync('.env.local', 'utf8')
-const pwMatch = raw.match(/password database[^=]*=\s*(\S+)/i)
-const password = pwMatch ? pwMatch[1] : process.env.PGPASSWORD
-
-const client = new pg.Client({
-  host: process.env.PGHOST || 'aws-0-ap-southeast-1.pooler.supabase.com',
-  port: 5432,
-  user: process.env.PGUSER || 'postgres.huaggvlpknwzarpgjkso',
-  password,
-  database: 'postgres',
-  ssl: { rejectUnauthorized: false },
-})
+const client = await connect()
 
 const ORG = '20000000-0000-0000-0000-000000000001'
 
 async function q(sql, params) { return (await client.query(sql, params)).rows }
 
-await client.connect()
 try {
   await client.query('begin')
 

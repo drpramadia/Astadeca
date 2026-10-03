@@ -33,5 +33,12 @@ async function probe(token, label) {
   }
 }
 
-const tok = await getToken('diraprama1@gmail.com', '15@priL1990')
-await probe(tok, 'SYSTEM_ADMIN drpramadia')
+const EMAIL = env.TEST_EMAIL || process.env.TEST_EMAIL
+const PASSWORD = env.TEST_PW_SUPERADMIN || process.env.TEST_PW_SUPERADMIN || env.TEST_PW_DRPRAMADIA || process.env.TEST_PW_DRPRAMADIA
+if (!EMAIL || !PASSWORD) {
+  console.error('Set TEST_EMAIL and TEST_PW_SUPERADMIN (or TEST_PW_DRPRAMADIA) in .env.local')
+  process.exit(1)
+}
+
+const tok = await getToken(EMAIL, PASSWORD)
+await probe(tok, `probe ${EMAIL}`)

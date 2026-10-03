@@ -1,21 +1,9 @@
-import pg from 'pg'
-import fs from 'node:fs'
+import { connect } from './db-config.mjs'
 
-const raw = fs.readFileSync('.env.local', 'utf8')
-const pwMatch = raw.match(/password database[^=]*=\s*(\S+)/i)
-const password = pwMatch ? pwMatch[1] : process.env.PGPASSWORD
-const client = new pg.Client({
-  host: 'aws-0-ap-southeast-1.pooler.supabase.com',
-  port: 5432,
-  user: 'postgres.huaggvlpknwzarpgjkso',
-  password,
-  database: 'postgres',
-  ssl: { rejectUnauthorized: false },
-})
+const client = await connect()
 
 const ORG = '20000000-0000-0000-0000-000000000001'
 
-await client.connect()
 try {
   await client.query('begin')
 

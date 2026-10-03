@@ -22,7 +22,7 @@ if (!URL || !SERVICE) {
 }
 
 const EMAIL = 'diraprama1@gmail.com'
-const PASSWORD = '15@priL1990'
+const PASSWORD = env.SUPERADMIN_PASSWORD
 const USERNAME = 'drpramadia'
 const ORG_ID = '20000000-0000-0000-0000-000000000001'
 const DIRECTOR_ROLE_ID = '00000000-0000-0000-0000-000000000001'

@@ -5,21 +5,9 @@
  * Semua operasi dibungkus satu transaksi dan DI-ROLLBACK di akhir,
  * jadi data produksi tidak berubah. Output = laporan PASS/FAIL.
  */
-import pg from 'pg'
-import fs from 'node:fs'
+import { connect } from './db-config.mjs'
 
-const raw = fs.readFileSync('.env.local', 'utf8')
-const pwMatch = raw.match(/password database[^=]*=\s*(\S+)/i)
-const password = pwMatch ? pwMatch[1] : process.env.PGPASSWORD
-
-const client = new pg.Client({
-  host: process.env.PGHOST || 'aws-0-ap-southeast-1.pooler.supabase.com',
-  port: 5432,
-  user: process.env.PGUSER || 'postgres.huaggvlpknwzarpgjkso',
-  password,
-  database: 'postgres',
-  ssl: { rejectUnauthorized: false },
-})
+const client = await connect()
 
 const ORG = '20000000-0000-0000-0000-000000000001'
 const USER = '00000000-0000-0000-0000-000000000001'
@@ -33,7 +21,6 @@ function check(name, cond, detail = '') {
   console.log(`${cond ? 'PASS' : 'FAIL'}  ${name}${detail ? ' — ' + detail : ''}`)
 }
 
-await client.connect()
 try {
   await client.query('begin')
 

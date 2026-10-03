@@ -99,7 +99,7 @@ async function createOrUpdateUser(user) {
 async function main() {
   await createOrUpdateUser({
     email: 'ratih.cinthia@gmail.com',
-    password: 'ciaastadeca',
+    password: env.DIRECTOR_PASSWORD,
     username: 'ratih.cinthia',
     full_name: 'Ratih Cinthia',
     role_id: '00000000-0000-0000-0000-000000000001', // DIRECTOR
@@ -108,7 +108,7 @@ async function main() {
 
   await createOrUpdateUser({
     email: 'adm.astadeca@gmail.com',
-    password: 'gianastadeca',
+    password: env.ADMIN_PASSWORD,
     username: 'gian',
     full_name: 'Gian',
     role_id: '00000000-0000-0000-0000-000000000002', // ADMIN
