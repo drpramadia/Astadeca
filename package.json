@@ -12,7 +12,9 @@
     "test:auth": "node scripts/test-auth-rls.mjs",
     "test:password": "node scripts/test-self-password.mjs",
     "test:admin": "node scripts/test-admin-flows.mjs",
-    "test:approval": "node scripts/test-approval-flow.mjs"
+    "test:approval": "node scripts/test-approval-flow.mjs",
+    "backup": "node scripts/backup.mjs",
+    "restore": "node scripts/restore.mjs"
   },
   "dependencies": {
     "@react-pdf/renderer": "^4.9.0",
