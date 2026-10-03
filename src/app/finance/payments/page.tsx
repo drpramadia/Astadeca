@@ -39,6 +39,8 @@ export default function PaymentsPage() {
   const [error, setError] = useState<string | null>(null)
   const [printData, setPrintData] = useState<DocumentPrintData | null>(null)
   const [loadingPrint, setLoadingPrint] = useState(false)
+  const [invoices, setInvoices] = useState<{ id: string; invoice_number: string; total_amount: number; status: string }[]>([])
+  const [invoiceId, setInvoiceId] = useState('')
   const [form, setForm] = useState({
     amount: '',
     payment_method: 'BANK_TRANSFER',
@@ -46,6 +48,18 @@ export default function PaymentsPage() {
     notes: '',
     payment_date: new Date().toISOString().split('T')[0],
   })
+
+  async function loadInvoices() {
+    const { data: rows } = await supabase
+      .from('rental_billing')
+      .select('id, invoice_number, total_amount, status')
+      .eq('organization_id', organizationId)
+      .neq('status', 'PAID')
+      .neq('status', 'CANCELLED')
+      .order('created_at', { ascending: false })
+      .limit(100)
+    setInvoices((rows as { id: string; invoice_number: string; total_amount: number; status: string }[]) || [])
+  }
 
   useEffect(() => {
     if (!loaded) return
@@ -80,12 +94,15 @@ export default function PaymentsPage() {
       payment_method: form.payment_method,
       bank_account: form.bank_account || null,
       notes: form.notes || null,
+      reference_type: invoiceId ? 'RENTAL_BILLING' : null,
+      reference_id: invoiceId || null,
       created_by: userData.user?.id,
     }
     const { error: err } = await supabase.from('payments').insert(payload)
     setSaving(false)
     if (err) { setError(err.message); return }
     setShowForm(false)
+    setInvoiceId('')
     setForm({
       amount: '',
       payment_method: 'BANK_TRANSFER',
@@ -185,7 +202,7 @@ export default function PaymentsPage() {
               <Printer className="w-4 h-4" /> <span>Cetak Laporan</span>
             </button>
             <button
-              onClick={() => setShowForm(true)}
+              onClick={() => { setShowForm(true); loadInvoices() }}
               className="flex items-center gap-2 px-4 py-2 bg-primary hover:bg-primary/90 text-white text-sm font-medium rounded-lg transition-colors"
             >
               <Plus className="w-4 h-4" /> <span>Baru</span>
@@ -229,6 +246,27 @@ export default function PaymentsPage() {
                   onChange={(e) => setForm({ ...form, payment_date: e.target.value })}
                   className="w-full border border-slate-200 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
                 />
+              </div>
+              <div className="sm:col-span-3">
+                <label className="block text-sm font-medium text-slate-700 mb-1">Bayar Invoice (opsional)</label>
+                <select
+                  value={invoiceId}
+                  onChange={(e) => {
+                    const id = e.target.value
+                    setInvoiceId(id)
+                    const inv = invoices.find((i) => i.id === id)
+                    if (inv && !form.amount) setForm((f) => ({ ...f, amount: String(inv.total_amount) }))
+                  }}
+                  className="w-full border border-slate-200 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+                >
+                  <option value="">-- Tanpa invoice (pembayaran umum) --</option>
+                  {invoices.map((i) => (
+                    <option key={i.id} value={i.id}>
+                      {i.invoice_number} — Rp {Number(i.total_amount).toLocaleString('id-ID')} ({i.status})
+                    </option>
+                  ))}
+                </select>
+                <p className="text-xs text-slate-400 mt-1">Pilih invoice rental untuk menandai lunas otomatis.</p>
               </div>
               <div className="sm:col-span-3">
                 <label className="block text-sm font-medium text-slate-700 mb-1">Bank Account</label>

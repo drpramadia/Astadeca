@@ -35,7 +35,12 @@ export function printElement(elementId: string, documentTitle?: string): void {
   document.body.classList.add('printing')
   el.classList.add('print-target')
 
+  let timer: number | undefined
   const cleanup = () => {
+    if (timer !== undefined) {
+      window.clearTimeout(timer)
+      timer = undefined
+    }
     document.body.classList.remove('printing')
     el.classList.remove('print-target')
     document.title = previousTitle
@@ -44,6 +49,6 @@ export function printElement(elementId: string, documentTitle?: string): void {
 
   window.addEventListener('afterprint', cleanup)
   // Fallback bila afterprint tidak dipanggil (beberapa browser)
-  window.setTimeout(cleanup, 2000)
+  timer = window.setTimeout(cleanup, 2000)
   window.print()
 }

@@ -142,6 +142,23 @@ export default function QCPage() {
     setSaving(true)
     setError(null)
 
+    // 1) Upload semua foto DULU supaya tidak menyisakan data setengah jadi
+    const uploadedUrls: (string | null)[] = []
+    for (const l of validLines) {
+      if (l.photo && organizationId) {
+        const up = await uploadGoodsPhoto(l.photo, organizationId, activeTab.toLowerCase())
+        if (up.error) {
+          setError(`Upload foto gagal: ${up.error}`)
+          setSaving(false)
+          return
+        }
+        uploadedUrls.push(up.url)
+      } else {
+        uploadedUrls.push(null)
+      }
+    }
+
+    // 2) Baru simpan header + rincian
     const { data: header, error: headerErr } = await supabase
       .from('qc_inspections')
       .insert({
@@ -164,30 +181,19 @@ export default function QCPage() {
       return
     }
 
-    const prepared: Record<string, unknown>[] = []
-    for (const l of validLines) {
-      let photoUrl: string | null = null
-      if (l.photo && organizationId) {
-        const up = await uploadGoodsPhoto(l.photo, organizationId, activeTab.toLowerCase())
-        if (up.error) {
-          setError(`Upload foto gagal: ${up.error}`)
-          setSaving(false)
-          return
-        }
-        photoUrl = up.url
-      }
-      prepared.push({
-        inspection_id: header.id,
-        item_name: l.item_name.trim(),
-        quantity_kg: parseFloat(l.quantity_kg) || 0,
-        condition: l.condition,
-        notes: l.notes || null,
-        photo_url: photoUrl,
-      })
-    }
+    const prepared: Record<string, unknown>[] = validLines.map((l, i) => ({
+      inspection_id: header.id,
+      item_name: l.item_name.trim(),
+      quantity_kg: parseFloat(l.quantity_kg) || 0,
+      condition: l.condition,
+      notes: l.notes || null,
+      photo_url: uploadedUrls[i],
+    }))
 
     const { error: lineErr } = await supabase.from('qc_inspection_lines').insert(prepared)
     if (lineErr) {
+      // Bersihkan header agar tidak ada inspeksi tanpa rincian
+      await supabase.from('qc_inspections').delete().eq('id', header.id)
       setError(lineErr.message)
       setSaving(false)
       return
