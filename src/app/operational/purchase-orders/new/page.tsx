@@ -7,6 +7,7 @@ import { supabase } from '@/lib/supabase/client'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { Loader2, X, Plus, Trash2 } from 'lucide-react'
+import { QuickAddSelect } from '@/components/quick-add-select'
 
 type Supplier = { id: string; name: string }
 type Product = { id: string; name: string; sku: string; unit_id: string | null }
@@ -138,13 +139,16 @@ export default function NewPOPage() {
           )}
 
           <div className={loadingRefs ? "bg-white rounded-xl border border-slate-200 p-6 space-y-5 opacity-50 pointer-events-none" : "bg-white rounded-xl border border-slate-200 p-6 space-y-5"}>
-            <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1">Supplier *</label>
-              <select value={supplierId} onChange={(e) => setSupplierId(e.target.value)} required className="w-full border border-slate-200 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary">
-                <option value="">-- Pilih Supplier --</option>
-                {suppliers.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
-              </select>
-            </div>
+            <QuickAddSelect
+              table="suppliers"
+              organizationId={organizationId}
+              label="Supplier *"
+              value={supplierId}
+              options={suppliers.map((s) => ({ id: s.id, name: s.name }))}
+              onChange={(id) => setSupplierId(id)}
+              onAdded={(row) => setSuppliers((prev) => [...prev, { id: row.id, name: row.name }])}
+              placeholder="-- Pilih Supplier --"
+            />
             <div>
               <label className="block text-sm font-medium text-slate-700 mb-1">Catatan</label>
               <textarea value={notes} onChange={(e) => setNotes(e.target.value)} rows={2} className="w-full border border-slate-200 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary resize-none" />
@@ -162,10 +166,16 @@ export default function NewPOPage() {
               {items.map((item, idx) => (
                 <div key={idx} className="flex gap-3 items-start">
                   <div className="flex-1">
-                    <select value={item.product_id} onChange={(e) => updateItem(idx, 'product_id', e.target.value)} className="w-full border border-slate-200 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary">
-                      <option value="">-- Pilih Produk --</option>
-                      {products.map((p) => <option key={p.id} value={p.id}>{p.name} ({p.sku})</option>)}
-                    </select>
+                    <QuickAddSelect
+                      table="products"
+                      organizationId={organizationId}
+                      value={item.product_id}
+                      options={products.map((p) => ({ id: p.id, name: `${p.name} (${p.sku})` }))}
+                      onChange={(id) => updateItem(idx, 'product_id', id)}
+                      onAdded={(row) => setProducts((prev) => [...prev, { id: row.id, name: row.name, sku: '', unit_id: null }])}
+                      placeholder="-- Pilih Produk --"
+                      extraFields={[{ key: 'sku', label: 'SKU', placeholder: 'SKU (opsional)' }]}
+                    />
                   </div>
                   <div className="w-32">
                     <input type="number" step="0.01" placeholder="Qty (kg)" value={item.quantity_kg} onChange={(e) => updateItem(idx, 'quantity_kg', e.target.value)} className="w-full border border-slate-200 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary" />

@@ -23,11 +23,11 @@ export function notificationHref(
     case 'DELIVERY_REQUEST':
       return '/operational/delivery-orders'
 
-    // Dokumen transaksi lain -> halaman terkait
+    // Dokumen transaksi lain -> halaman detail terkait
     case 'PURCHASE_ORDER':
-      return '/operational/purchase-orders'
+      return referenceId ? `/operational/purchase-orders/${referenceId}` : '/operational/purchase-orders'
     case 'SALES_ORDER':
-      return '/operational/sales-orders'
+      return referenceId ? `/operational/sales-orders/${referenceId}` : '/operational/sales-orders'
     case 'CONTRACT':
       return referenceId ? `/cold-storage/contracts/${referenceId}` : '/cold-storage/contracts'
     case 'RENTAL_INQUIRY':

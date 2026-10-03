@@ -6,6 +6,7 @@ import { Modal } from '@/components/ui/modal'
 import { DocumentPrintView, type DocumentPrintData } from '@/components/document-print'
 import { useSession } from '@/hooks/use-session'
 import { useEffect, useState } from 'react'
+import { useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabase/client'
 import Link from 'next/link'
 import { Plus, Search, ShoppingCart, Loader2, Printer } from 'lucide-react'
@@ -29,6 +30,7 @@ type POLine = {
 
 export default function PurchaseOrdersPage() {
   const { roleCode, loaded, organizationId } = useSession()
+  const router = useRouter()
   const [data, setData] = useState<PO[]>([])
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
@@ -168,7 +170,7 @@ export default function PurchaseOrdersPage() {
                 <tr><td colSpan={6} className="text-center py-12 text-slate-400"><ShoppingCart className="w-8 h-8 mx-auto mb-2 opacity-30" /><p>Belum ada Purchase Order</p></td></tr>
               ) : (
                 filtered.map((row) => (
-                  <tr key={row.id} className="border-b border-slate-100 hover:bg-slate-50 transition-colors">
+                  <tr key={row.id} onClick={() => router.push(`/operational/purchase-orders/${row.id}`)} className="border-b border-slate-100 hover:bg-slate-50 transition-colors cursor-pointer">
                     <td className="px-4 py-3 font-mono font-medium text-cyan-700">{row.po_number}</td>
                     <td className="px-4 py-3 font-medium text-slate-800">{row.suppliers?.name ?? '-'}</td>
                     <td className="px-4 py-3 text-slate-600">{row.profiles?.full_name ?? '-'}</td>
@@ -177,7 +179,7 @@ export default function PurchaseOrdersPage() {
                     </td>
                     <td className="px-4 py-3 text-right text-slate-500 text-xs">{new Date(row.created_at).toLocaleDateString('id-ID')}</td>
                     <td className="px-4 py-3 text-center">
-                      <button onClick={() => openPrint(row.id)} className="inline-flex items-center gap-1 px-3 py-1.5 text-xs font-medium text-primary border border-primary/30 rounded-lg hover:bg-primary/5 transition-colors">
+                      <button onClick={(e) => { e.stopPropagation(); openPrint(row.id) }} className="inline-flex items-center gap-1 px-3 py-1.5 text-xs font-medium text-primary border border-primary/30 rounded-lg hover:bg-primary/5 transition-colors">
                         <Printer className="w-3.5 h-3.5" /> Cetak
                       </button>
                     </td>

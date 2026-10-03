@@ -3,6 +3,7 @@
 import AppShell from '@/components/app-shell'
 import { Modal } from '@/components/ui/modal'
 import { DocumentPrintView, type DocumentPrintData } from '@/components/document-print'
+import { QuickAddSelect } from '@/components/quick-add-select'
 import { useSession } from '@/hooks/use-session'
 import { useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabase/client'
@@ -147,11 +148,6 @@ export default function GoodsReceiptsPage() {
 
   function removeLine(idx: number) {
     setRecvLines((prev) => prev.filter((_, i) => i !== idx))
-  }
-
-  function setLineProduct(idx: number, productId: string) {
-    const p = products.find((x) => x.id === productId)
-    updateLine(idx, { product_id: productId, name: p?.name ?? '' })
   }
 
   async function handleReceive(e: React.FormEvent) {
@@ -342,14 +338,18 @@ export default function GoodsReceiptsPage() {
               <div className="space-y-2">
                 {recvLines.map((l, idx) => (
                   <div key={idx} className="grid grid-cols-12 gap-2 items-center bg-slate-50 rounded-lg p-3">
-                    <select
-                      className="col-span-12 sm:col-span-4 border border-slate-200 rounded-lg px-3 py-2 text-sm"
-                      value={l.product_id}
-                      onChange={(e) => setLineProduct(idx, e.target.value)}
-                    >
-                      <option value="">-- Pilih barang --</option>
-                      {products.map((p) => <option key={p.id} value={p.id}>{p.name}{p.sku ? ` (${p.sku})` : ''}</option>)}
-                    </select>
+                    <div className="col-span-12 sm:col-span-4">
+                      <QuickAddSelect
+                        table="products"
+                        organizationId={organizationId}
+                        value={l.product_id}
+                        options={products.map((p) => ({ id: p.id, name: `${p.name}${p.sku ? ` (${p.sku})` : ''}` }))}
+                        onChange={(id, nm) => updateLine(idx, { product_id: id, name: nm })}
+                        onAdded={(row) => setProducts((prev) => [...prev, { id: row.id, name: row.name, sku: null }])}
+                        placeholder="-- Pilih barang --"
+                        extraFields={[{ key: 'sku', label: 'SKU', placeholder: 'SKU (opsional)' }]}
+                      />
+                    </div>
                     <input className="col-span-6 sm:col-span-3 border border-slate-200 rounded-lg px-3 py-2 text-sm" placeholder="Batch" value={l.batch_number} onChange={(e) => updateLine(idx, { batch_number: e.target.value })} />
                     <input className="col-span-6 sm:col-span-2 border border-slate-200 rounded-lg px-3 py-2 text-sm" type="number" step="0.01" placeholder="Qty kg" value={l.quantity_kg} onChange={(e) => updateLine(idx, { quantity_kg: e.target.value })} />
                     <select className="col-span-10 sm:col-span-2 border border-slate-200 rounded-lg px-3 py-2 text-sm" value={l.condition} onChange={(e) => updateLine(idx, { condition: e.target.value })}>
