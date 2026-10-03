@@ -157,6 +157,13 @@ export default function ContractDetailPage() {
     setRelSaving(true)
     setError(null)
 
+    // Gate: barang tidak boleh keluar bila masih ada tagihan belum lunas
+    if (billing && ['SENT', 'OVERDUE'].includes(billing.status)) {
+      setRelSaving(false)
+      setError('Barang tidak dapat dikeluarkan: tagihan belum lunas. Lunasi dulu atau ajukan approval pengeluaran.')
+      return
+    }
+
     const { error: insErr } = await supabase.from('rental_releases').insert({
       organization_id: organizationId,
       contract_id: contractId,
@@ -179,6 +186,23 @@ export default function ContractDetailPage() {
     setRelNotes('')
     setRelSaving(false)
     await fetchData()
+  }
+
+  async function requestReleaseApproval() {
+    if (!contractId || !userId) return
+    setRelSaving(true)
+    setError(null)
+    const { error: apprErr } = await supabase.from('approval_requests').insert({
+      organization_id: organizationId,
+      request_type: 'RENTAL_RELEASE',
+      reference_id: contractId,
+      status: 'PENDING',
+      requested_by: userId,
+      notes: `Permintaan pengeluaran barang untuk kontrak ${contract?.contract_number ?? contractId}`,
+    })
+    setRelSaving(false)
+    if (apprErr) { setError(apprErr.message); return }
+    alert('Permintaan approval pengeluaran terkirim ke Director.')
   }
 
   async function recalculateBilling() {
@@ -387,6 +411,16 @@ export default function ContractDetailPage() {
               <PackageMinus className="w-4 h-4 text-red-600" /> Barang Keluar
             </h2>
 
+            {billing && ['SENT', 'OVERDUE'].includes(billing.status) && (
+              <div className="mb-4 p-3 bg-amber-50 border border-amber-200 rounded-lg text-sm text-amber-800">
+                <p className="font-medium flex items-center gap-2"><AlertTriangle className="w-4 h-4" /> Tagihan belum lunas</p>
+                <p className="mt-1 text-xs">Barang tidak dapat dikeluarkan sebelum tagihan dilunasi.</p>
+                <button onClick={requestReleaseApproval} disabled={relSaving} className="mt-2 inline-flex items-center gap-1 px-3 py-1.5 text-xs font-medium text-amber-900 border border-amber-300 rounded-lg hover:bg-amber-100 disabled:opacity-60">
+                  Ajukan Approval Pengeluaran
+                </button>
+              </div>
+            )}
+
             <div className="space-y-3 mb-5">
               <div className="grid grid-cols-2 gap-2">
                 <input type="number" placeholder="Jumlah (kg)" value={relKg} onChange={(e) => setRelKg(e.target.value)} className="border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary" />
@@ -396,7 +430,11 @@ export default function ContractDetailPage() {
                 <input type="date" value={relDate} onChange={(e) => setRelDate(e.target.value)} className="border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary" />
                 <input type="text" placeholder="Catatan" value={relNotes} onChange={(e) => setRelNotes(e.target.value)} className="border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary" />
               </div>
-              <button onClick={addRelease} disabled={relSaving} className="flex items-center gap-2 px-4 py-2 bg-red-500 hover:bg-red-600 text-white text-sm font-medium rounded-lg transition-colors disabled:opacity-60 w-full justify-center">
+              <button
+                onClick={addRelease}
+                disabled={relSaving || (!!billing && ['SENT', 'OVERDUE'].includes(billing.status))}
+                className="flex items-center gap-2 px-4 py-2 bg-red-500 hover:bg-red-600 text-white text-sm font-medium rounded-lg transition-colors disabled:opacity-60 w-full justify-center"
+              >
                 {relSaving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Plus className="w-4 h-4" />}
                 <span>Tambah Barang Keluar</span>
               </button>
