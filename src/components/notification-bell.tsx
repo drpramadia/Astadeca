@@ -6,6 +6,7 @@ import { supabase } from '@/lib/supabase/client'
 import { useSession } from '@/hooks/use-session'
 import { StatusBadge } from '@/components/ui/status-badge'
 import { formatDate } from '@/lib/utils'
+import { notificationHref } from '@/lib/notification-route'
 import {
   Bell,
   Check,
@@ -113,16 +114,9 @@ export default function NotificationBell() {
     }
     setOpen(false)
 
-    // Notifikasi persetujuan -> langsung ke halaman detail approval
-    if (n.reference_type === 'APPROVAL' && n.reference_id) {
-      if (canApprove) {
-        router.push(`/approval/requests/${n.reference_id}`)
-        return
-      }
-      router.push('/approval/requests')
-      return
-    }
-    router.push('/notifications')
+    // Semua notifikasi dokumen -> buka dokumen/approval terkait
+    const href = notificationHref(n.reference_type, n.reference_id, { canApprove })
+    router.push(href)
   }
 
   async function decide(id: string, decision: 'APPROVED' | 'REJECTED') {

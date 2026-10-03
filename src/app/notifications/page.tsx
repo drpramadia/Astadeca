@@ -3,10 +3,12 @@
 import AppShell from '@/components/app-shell'
 import { useSession } from '@/hooks/use-session'
 import { useEffect, useState } from 'react'
+import { useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabase/client'
 import { StatusBadge } from '@/components/ui/status-badge'
 import { formatDate } from '@/lib/utils'
-import { Bell, Loader2, X, Check, Trash2 } from 'lucide-react'
+import { notificationHref } from '@/lib/notification-route'
+import { Bell, Loader2, X, Check, Trash2, ChevronRight } from 'lucide-react'
 
 type Notification = {
   id: string
@@ -19,9 +21,12 @@ type Notification = {
 }
 
 export default function NotificationsPage() {
-  const { organizationId, loaded } = useSession()
+  const { organizationId, loaded, roleCode } = useSession()
+  const router = useRouter()
   const [data, setData] = useState<Notification[]>([])
   const [loading, setLoading] = useState(true)
+
+  const canApprove = roleCode === 'DIRECTOR' || roleCode === 'SYSTEM_ADMIN'
 
   useEffect(() => {
     if (!loaded) return
@@ -58,6 +63,11 @@ export default function NotificationsPage() {
     if (!confirm('Hapus notifikasi ini?')) return
     await supabase.from('notifications').delete().eq('id', id)
     setData((prev) => prev.filter((n) => n.id !== id))
+  }
+
+  async function openNotification(row: Notification) {
+    if (!row.is_read) await markAsRead(row.id)
+    router.push(notificationHref(row.reference_type, row.reference_id, { canApprove }))
   }
 
   const unreadCount = data.filter((n) => !n.is_read).length
@@ -102,7 +112,8 @@ export default function NotificationsPage() {
               {data.map((row) => (
                 <div
                   key={row.id}
-                  className={`p-4 hover:bg-slate-50 transition-colors ${
+                  onClick={() => openNotification(row)}
+                  className={`p-4 hover:bg-slate-50 transition-colors cursor-pointer ${
                     !row.is_read ? 'bg-cyan-50/50' : ''
                   }`}
                 >
@@ -131,17 +142,9 @@ export default function NotificationsPage() {
                       </p>
                     </div>
                     <div className="flex items-center gap-1 flex-shrink-0">
-                      {!row.is_read && (
-                        <button
-                          onClick={() => markAsRead(row.id)}
-                          className="p-1 rounded-lg text-slate-400 hover:text-cyan-600 hover:bg-slate-100 transition-colors"
-                          title="Mark as read"
-                        >
-                          <Check className="w-4 h-4" />
-                        </button>
-                      )}
+                      <ChevronRight className="w-4 h-4 text-slate-300" />
                       <button
-                        onClick={() => handleDelete(row.id)}
+                        onClick={(e) => { e.stopPropagation(); handleDelete(row.id) }}
                         className="p-1 rounded-lg text-slate-400 hover:text-red-500 hover:bg-red-50 transition-colors"
                         title="Hapus"
                       >
