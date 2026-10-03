@@ -32,6 +32,7 @@ import {
 import { useSession } from '@/hooks/use-session'
 import NotificationBell from '@/components/notification-bell'
 import UserMenu from '@/components/user-menu'
+import { GlobalSearch } from '@/components/global-search'
 
 type NavItem = {
   label: string
@@ -366,13 +367,15 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
             <span className="font-bold text-slate-800 font-display text-sm">Astadeca Baswara Persada</span>
           </div>
           <div className="flex items-center gap-1">
+            <GlobalSearch />
             <NotificationBell />
             <UserMenu />
           </div>
         </header>
 
         {/* Top bar (desktop) */}
-        <header className="hidden lg:flex items-center justify-end gap-2 h-16 px-8 border-b border-slate-200 bg-white flex-shrink-0">
+        <header className="hidden lg:flex items-center gap-2 h-16 px-8 border-b border-slate-200 bg-white flex-shrink-0">
+          <GlobalSearch />
           <NotificationBell />
           <div className="w-px h-8 bg-slate-200 mx-1" />
           <UserMenu />
