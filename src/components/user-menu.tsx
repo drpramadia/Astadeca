@@ -4,7 +4,7 @@ import { useState, useRef, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabase/client'
 import { useSession } from '@/hooks/use-session'
-import { ChevronDown, LogOut, ShieldCheck, User } from 'lucide-react'
+import { ChevronDown, LogOut, ShieldCheck, User, KeyRound } from 'lucide-react'
 
 function initials(name: string | null): string {
   if (!name) return '?'
@@ -78,8 +78,15 @@ export default function UserMenu() {
             </div>
           </div>
           <button
+            onClick={() => { setOpen(false); router.push('/account') }}
+            className="w-full flex items-center gap-2 px-4 py-3 text-sm font-medium text-slate-700 hover:bg-slate-50 transition-colors border-t border-slate-100"
+          >
+            <KeyRound className="w-4 h-4" />
+            <span>Akun Saya</span>
+          </button>
+          <button
             onClick={handleLogout}
-            className="w-full flex items-center gap-2 px-4 py-3 text-sm font-medium text-red-600 hover:bg-red-50 transition-colors"
+            className="w-full flex items-center gap-2 px-4 py-3 text-sm font-medium text-red-600 hover:bg-red-50 transition-colors border-t border-slate-100"
           >
             <LogOut className="w-4 h-4" />
             <span>Keluar</span>

@@ -69,3 +69,10 @@ jobs:
           TEST_PW_RATIH: ${{ secrets.TEST_PW_RATIH }}
           TEST_PW_GIAN: ${{ secrets.TEST_PW_GIAN }}
           TEST_PW_SISWOKO: ${{ secrets.TEST_PW_SISWOKO }}
+
+      - name: Self password change suite
+        run: npm run test:password
+        env:
+          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
+          NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
