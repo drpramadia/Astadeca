@@ -61,6 +61,7 @@ const NAV_GROUPS: NavGroup[] = [
     items: [
       { label: 'Rental Inquiry', href: '/cold-storage/inquiries', icon: PackageSearch },
       { label: 'Kontrak', href: '/cold-storage/contracts', icon: FileText },
+      { label: 'Titipan Harian', href: '/cold-storage/spot', icon: PackageSearch },
       { label: 'Rates', href: '/cold-storage/rates', icon: DollarSign },
       { label: 'Billing', href: '/cold-storage/billing', icon: DollarSign },
     ],

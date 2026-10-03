@@ -87,6 +87,7 @@ export function GlobalSearch() {
     const menu: Result[] = [
       { id: 'm-dash', label: 'Dashboard', href: '/dashboard', group: 'Menu', icon: FileText },
       { id: 'm-cs', label: 'Kontrak Rental', href: '/cold-storage/contracts', group: 'Menu', icon: FileText },
+      { id: 'm-spot', label: 'Titipan Harian', href: '/cold-storage/spot', group: 'Menu', icon: Package },
       { id: 'm-bill', label: 'Billing', href: '/cold-storage/billing', group: 'Menu', icon: FileText },
       { id: 'm-inv', label: 'Inventory', href: '/warehouse/inventory', group: 'Menu', icon: Boxes },
       { id: 'm-basket', label: 'Keranjang & Lokasi', href: '/warehouse/baskets', group: 'Menu', icon: Package },
