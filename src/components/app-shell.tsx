@@ -82,6 +82,7 @@ const NAV_GROUPS: NavGroup[] = [
       { label: 'Penerimaan Barang', href: '/warehouse/goods-receipts', icon: ArrowDownToLine },
       { label: 'Pengeluaran Barang', href: '/warehouse/goods-issues', icon: ArrowUpFromLine },
       { label: 'Inventory', href: '/warehouse/inventory', icon: Boxes },
+      { label: 'Keranjang & Lokasi', href: '/warehouse/baskets', icon: Boxes },
       { label: 'QC Inspection', href: '/warehouse/qc', icon: ClipboardCheck },
     ],
   },

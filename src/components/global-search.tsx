@@ -89,6 +89,7 @@ export function GlobalSearch() {
       { id: 'm-cs', label: 'Kontrak Rental', href: '/cold-storage/contracts', group: 'Menu', icon: FileText },
       { id: 'm-bill', label: 'Billing', href: '/cold-storage/billing', group: 'Menu', icon: FileText },
       { id: 'm-inv', label: 'Inventory', href: '/warehouse/inventory', group: 'Menu', icon: Boxes },
+      { id: 'm-basket', label: 'Keranjang & Lokasi', href: '/warehouse/baskets', group: 'Menu', icon: Package },
       { id: 'm-gr', label: 'Penerimaan Barang', href: '/warehouse/goods-receipts', group: 'Menu', icon: Package },
       { id: 'm-qc', label: 'QC Inspection', href: '/warehouse/qc', group: 'Menu', icon: ClipboardCheck },
       { id: 'm-docs', label: 'Dokumen', href: '/documents', group: 'Menu', icon: FileText },
