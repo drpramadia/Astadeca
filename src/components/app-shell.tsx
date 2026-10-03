@@ -125,34 +125,55 @@ const NAV_GROUPS: NavGroup[] = [
 ]
 
 function getVisibleGroups(roleCode: string | null): (NavGroup | NavItem)[] {
-  const visibleGroups = NAV_GROUPS.filter((g) => {
-    if (roleCode === 'SYSTEM_ADMIN') return true
-    if (roleCode === 'WAREHOUSE') {
-      return ['Cold Storage', 'Warehouse', 'Dokumen'].includes(g.label)
-    }
-    if (roleCode === 'ADMIN') {
-      return !['Administrasi'].includes(g.label)
-    }
-    // DIRECTOR or unknown
-    return g.label !== 'Administrasi'
-  })
+  const visibleGroups = NAV_GROUPS
+    .filter((g) => {
+      if (roleCode === 'SYSTEM_ADMIN') return true
+      if (roleCode === 'WAREHOUSE') {
+        return ['Cold Storage', 'Warehouse', 'Dokumen'].includes(g.label)
+      }
+      if (roleCode === 'ADMIN') {
+        return !['Administrasi'].includes(g.label)
+      }
+      // DIRECTOR or unknown
+      return g.label !== 'Administrasi'
+    })
+    .map((g) => {
+      // WAREHOUSE: sembunyikan Rates & Billing (hanya admin/director)
+      if (roleCode === 'WAREHOUSE' && g.label === 'Cold Storage') {
+        return {
+          ...g,
+          items: g.items.filter((i) => i.href !== '/cold-storage/rates' && i.href !== '/cold-storage/billing'),
+        }
+      }
+      return g
+    })
+    .filter((g) => ('items' in g ? g.items.length > 0 : true))
 
   // Dashboard is always first, as a top-level item (not in a group)
   return [DASHBOARD_ITEM, ...visibleGroups]
 }
-function NavLink({ item, isActive }: { item: NavItem; isActive: boolean }) {
+function NavLink({ item, isActive, expanded }: { item: NavItem; isActive: boolean; expanded: boolean }) {
   const Icon = item.icon
   return (
     <Link
       href={item.href}
-      className={`flex items-center gap-3 px-4 py-2.5 rounded-lg text-sm font-medium transition-all ${
+      title={expanded ? undefined : item.label}
+      className={`group flex items-center rounded-lg text-sm font-medium transition-colors ${
+        expanded ? 'gap-3 px-4 py-2.5' : 'justify-center h-10 w-10 mx-auto'
+      } ${
         isActive
-          ? 'text-white bg-cyan-500/20 border-l-2 border-cyan-400 pl-[14px]'
-          : 'text-white/50 hover:text-white hover:bg-white/5'
+          ? 'text-white bg-cyan-500/20'
+          : 'text-white/55 hover:text-white hover:bg-white/10'
       }`}
     >
-      <Icon className="w-4 h-4 flex-shrink-0" />
-      <span>{item.label}</span>
+      <span
+        className={`flex items-center justify-center rounded-md transition-colors ${
+          expanded ? '' : 'w-10 h-10'
+        } ${isActive ? 'text-cyan-300' : ''}`}
+      >
+        <Icon className="w-[18px] h-[18px] flex-shrink-0" />
+      </span>
+      {expanded && <span className="truncate">{item.label}</span>}
     </Link>
   )
 }
@@ -162,43 +183,60 @@ function NavGroupRow({
   isOpen,
   onToggle,
   activeItem,
+  expanded,
 }: {
   group: NavGroup
   isOpen: boolean
   onToggle: () => void
   activeItem: string | null
+  expanded: boolean
 }) {
   const Icon = group.icon
   const hasActive = group.items.some((item) => item.href === activeItem)
+
+  // Mode mini: hanya tampilkan icon, klik = buka sidebar + buka grup
+  if (!expanded) {
+    return (
+      <button
+        onClick={onToggle}
+        title={group.label}
+        className={`flex items-center justify-center h-10 w-10 mx-auto rounded-lg transition-colors ${
+          hasActive ? 'text-cyan-300 bg-cyan-500/20' : 'text-white/55 hover:text-white hover:bg-white/10'
+        }`}
+      >
+        <Icon className="w-[18px] h-[18px] flex-shrink-0" />
+      </button>
+    )
+  }
 
   return (
     <div>
       <button
         onClick={onToggle}
-        className={`w-full flex items-center gap-3 px-4 py-2.5 rounded-lg text-sm font-semibold transition-all ${
+        className={`w-full flex items-center gap-3 px-4 py-2.5 rounded-lg text-sm font-semibold transition-colors ${
           hasActive
-            ? 'text-cyan-400 bg-cyan-500/10'
-            : 'text-white/60 hover:text-white hover:bg-white/5'
+            ? 'text-cyan-300 bg-cyan-500/10'
+            : 'text-white/60 hover:text-white hover:bg-white/10'
         }`}
       >
-        <Icon className="w-4 h-4 flex-shrink-0" />
-        <span className="flex-1 text-left">{group.label}</span>
+        <Icon className="w-[18px] h-[18px] flex-shrink-0" />
+        <span className="flex-1 text-left truncate">{group.label}</span>
         {group.badge && (
           <span className="px-1.5 py-0.5 rounded-full bg-cyan-500/20 text-cyan-300 text-[10px] font-semibold">
             {group.badge}
           </span>
         )}
         {isOpen ? (
-          <ChevronDown className="w-3.5 h-3.5" />
+          <ChevronDown className="w-3.5 h-3.5 flex-shrink-0" />
         ) : (
-          <ChevronRight className="w-3.5 h-3.5" />
+          <ChevronRight className="w-3.5 h-3.5 flex-shrink-0" />
         )}
       </button>
 
       {isOpen && (
-        <div className="mt-1 ml-4 space-y-0.5 border-l border-white/10 pl-3">
+        <div className="mt-1 ml-5 mr-1 space-y-0.5 border-l border-white/10 pl-3">
           {group.items.map((item) => (
-            <NavLink key={item.href} item={item} isActive={activeItem === item.href} />
+            <NavLink key={item.href} item={item} isActive={activeItem === item.href} expanded />
           ))}
         </div>
       )}
@@ -212,7 +250,8 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
   const router = useRouter()
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const [hovered, setHovered] = useState(false)
-  const expanded = hovered
+  const [pinned, setPinned] = useState(false)
+  const expanded = pinned || hovered
 
   useEffect(() => {
     if (loaded && !userId) {
@@ -301,13 +340,13 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
         onMouseLeave={() => setHovered(false)}
       >
         {/* Brand header */}
-        <div className="flex items-center gap-3 px-5 h-16 border-b border-white/10 flex-shrink-0">
+        <div className={`flex items-center h-16 border-b border-white/10 flex-shrink-0 ${expanded ? 'gap-3 px-5' : 'justify-center px-2'}`}>
           <div className="flex items-center justify-center w-9 h-9 rounded-lg flex-shrink-0">
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img src="/logo/astadeca.png" alt="Astadeca Baswara Persada" className="w-full h-full object-contain" />
           </div>
           {expanded && (
-            <div className="overflow-hidden">
+            <div className="overflow-hidden flex-1">
               <p className="text-white font-bold text-sm leading-tight truncate font-display">
                 Astadeca Baswara Persada
               </p>
@@ -316,17 +355,21 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
               </p>
             </div>
           )}
-          <button
-            onClick={() => setHovered(!hovered)}
-            className="ml-auto hidden lg:flex items-center justify-center w-7 h-7 rounded-md text-white/40 hover:text-white hover:bg-white/10 transition-colors"
-            aria-label={expanded ? 'Tutup sidebar' : 'Buka sidebar'}
-          >
-            <ChevronLeft className={`w-4 h-4 transition-transform ${expanded ? 'rotate-0' : 'rotate-180'}`} />
-          </button>
+          {expanded && (
+            <button
+              onClick={() => setPinned((p) => !p)}
+              onMouseEnter={(e) => e.stopPropagation()}
+              className="hidden lg:flex items-center justify-center w-7 h-7 rounded-md text-white/40 hover:text-white hover:bg-white/10 transition-colors flex-shrink-0"
+              aria-label={pinned ? 'Unpin sidebar' : 'Pin sidebar'}
+              title={pinned ? 'Unpin sidebar' : 'Pin sidebar'}
+            >
+              <ChevronLeft className={`w-4 h-4 transition-transform ${pinned ? '' : 'rotate-180'}`} />
+            </button>
+          )}
         </div>
 
         {/* Nav groups */}
-        <nav className="flex-1 overflow-y-auto py-4 px-3 space-y-1">
+        <nav className={`flex-1 overflow-y-auto sidebar-scroll py-4 space-y-1 ${expanded ? 'px-3' : 'px-2'}`}>
           {visibleNav.map((item) => {
             if ('items' in item) {
               return (
@@ -336,10 +379,11 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
                   isOpen={openGroups.has(item.label)}
                   onToggle={() => toggleGroup(item.label)}
                   activeItem={pathname}
+                  expanded={expanded}
                 />
               )
             }
-            return <NavLink key={item.href} item={item} isActive={pathname === item.href} />
+            return <NavLink key={item.href} item={item} isActive={pathname === item.href} expanded={expanded} />
           })}
         </nav>
 

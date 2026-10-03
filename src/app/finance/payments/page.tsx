@@ -1,6 +1,7 @@
 'use client'
 
 import AppShell from '@/components/app-shell'
+import { AccessDenied } from '@/components/access-denied'
 import { Modal } from '@/components/ui/modal'
 import { DocumentPrintView, type DocumentPrintData } from '@/components/document-print'
 import { useSession } from '@/hooks/use-session'
@@ -30,7 +31,8 @@ const PAYMENT_METHOD_LABELS: Record<string, string> = {
 }
 
 export default function PaymentsPage() {
-  const { organizationId, loaded } = useSession()
+  const { organizationId, loaded, roleCode } = useSession()
+  const canAccess = roleCode === 'ADMIN' || roleCode === 'DIRECTOR' || roleCode === 'SYSTEM_ADMIN'
   const [data, setData] = useState<Payment[]>([])
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
@@ -125,8 +127,7 @@ export default function PaymentsPage() {
     return (
       r.notes?.toLowerCase().includes(q) ||
       r.bank_account?.toLowerCase().includes(q) ||
-      r.payment_method?.toLowerCase().includes(q)
-    )
+      r.payment_method?.toLowerCase().includes(q)    )
   })
 
   const totalAmount = data.reduce((sum, r) => sum + Number(r.amount), 0)
@@ -180,6 +181,8 @@ export default function PaymentsPage() {
     })
     setLoadingPrint(false)
   }
+
+  if (loaded && !canAccess) return <AccessDenied message="Data pembayaran hanya untuk Admin, Director, atau System Administrator." />
 
   return (
     <AppShell>

@@ -8,6 +8,7 @@ import {
   ArrowUpFromLine,
   Boxes,
   ArrowRight,
+  QrCode,
 } from 'lucide-react'
 
 function ModuleCard({
@@ -53,8 +54,9 @@ export default function WarehousePage() {
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <ModuleCard label="Penerimaan Barang" description="Goods Receipt — barang masuk dari supplier" href="/warehouse/goods-receipts" icon={ArrowDownToLine} color="#22c55e" />
           <ModuleCard label="Pengeluaran Barang" description="Goods Issue — pelepasan stok barang" href="/warehouse/goods-issues" icon={ArrowUpFromLine} color="#f59e0b" />
-          <ModuleCard label="Inventory" description="Lihat stok barang di gudang" href="/warehouse/inventory" icon={Boxes} color="#8b5cf6" />
-          <ModuleCard label="QC Inspection" description="Inspeksi kualitas barang masuk" href="/warehouse/qc" icon={Warehouse} color="#ef4444" />
+          <ModuleCard label="Inventory" description="Lihat stok & penempatan barang di gudang" href="/warehouse/inventory" icon={Boxes} color="#8b5cf6" />
+          <ModuleCard label="Keranjang & Lokasi" description="Kelola basket penyimpanan & cetak label QR" href="/warehouse/baskets" icon={QrCode} color="#06b6d4" />
+          <ModuleCard label="QC Inspection" description="Inspeksi kualitas barang masuk & keluar" href="/warehouse/qc" icon={Warehouse} color="#ef4444" />
         </div>
       </div>
     </AppShell>

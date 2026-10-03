@@ -1,6 +1,7 @@
 'use client'
 
 import AppShell from '@/components/app-shell'
+import { AccessDenied } from '@/components/access-denied'
 import { Modal } from '@/components/ui/modal'
 import { DocumentPrintView, type DocumentPrintData } from '@/components/document-print'
 import { useSession } from '@/hooks/use-session'
@@ -22,7 +23,8 @@ type Transaction = {
 }
 
 export default function FinanceTransactionsPage() {
-  const { organizationId, loaded } = useSession()
+  const { organizationId, loaded, roleCode } = useSession()
+  const canAccess = roleCode === 'ADMIN' || roleCode === 'DIRECTOR' || roleCode === 'SYSTEM_ADMIN'
   const [data, setData] = useState<Transaction[]>([])
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
@@ -159,9 +161,11 @@ export default function FinanceTransactionsPage() {
       signatures: ['Dibuat Oleh', 'Diterima Oleh'],
     })
     setLoadingPrint(false)
-  }
+    }
 
-  return (
+    if (loaded && !canAccess) return <AccessDenied message="Data transaksi keuangan hanya untuk Admin, Director, atau System Administrator." />
+
+    return (
     <AppShell>
       <div className="p-6 lg:p-8 max-w-7xl mx-auto">
         <div className="flex items-start justify-between mb-6">

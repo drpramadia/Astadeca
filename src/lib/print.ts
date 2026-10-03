@@ -8,12 +8,14 @@ export type PrintCompany = {
   name: string
   address?: string | null
   phone?: string | null
+  logo?: string | null
 }
 
 export const DEFAULT_COMPANY: PrintCompany = {
   name: 'Astadeca Baswara Persada',
-  address: 'Cold Storage & Operasional',
+  address: 'Jl. Martanegara No.3, Lkr. Sel., Kec. Lengkong, Kota Bandung, Jawa Barat 40263',
   phone: null,
+  logo: '/logo/astadeca.png',
 }
 
 /**

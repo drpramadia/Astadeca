@@ -47,19 +47,36 @@ export default function NewInquiryPage() {
     setSaving(true)
     setError(null)
     const { data: userData } = await supabase.auth.getUser()
-    const { error: err } = await supabase.from('rental_inquiries').insert({
+    const uid = userData.user?.id ?? null
+    if (!uid) { setSaving(false); setError('Sesi tidak ditemukan. Silakan login ulang.'); return }
+    const { data: inserted, error: err } = await supabase
+      .from('rental_inquiries')
+      .insert({
+        organization_id: organizationId,
+        customer_id: form.customer_id || null,
+        cold_storage_id: form.cold_storage_id || null,
+        requested_kg: parseFloat(form.requested_kg) || 0,
+        start_date: form.start_date || null,
+        end_date: form.end_date || null,
+        notes: form.notes || null,
+        status: 'PENDING',
+        created_by: uid,
+      })
+      .select()
+      .single()
+    if (err || !inserted) { setSaving(false); setError(err?.message ?? 'Gagal menyimpan inquiry'); return }
+
+    // Buat approval request agar muncul di halaman Approval (Director)
+    await supabase.from('approval_requests').insert({
       organization_id: organizationId,
-      customer_id: form.customer_id || null,
-      cold_storage_id: form.cold_storage_id || null,
-      requested_kg: parseFloat(form.requested_kg) || 0,
-      start_date: form.start_date || null,
-      end_date: form.end_date || null,
-      notes: form.notes || null,
+      request_type: 'RENTAL_INQUIRY',
+      reference_id: inserted.id,
       status: 'PENDING',
-      created_by: userData.user?.id,
+      requested_by: uid,
+      notes: 'Permintaan sewa cold storage, menunggu persetujuan.',
     })
+
     setSaving(false)
-    if (err) { setError(err.message); return }
     router.push('/cold-storage/inquiries')
   }
 

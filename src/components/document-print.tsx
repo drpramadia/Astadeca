@@ -85,10 +85,16 @@ export function DocumentPrintView({
       <div id="print-doc" className="print-page bg-white border border-slate-200 rounded-lg p-8 text-[13px] text-ink">
         {/* Kop */}
         <div className="flex items-start justify-between border-b-2 border-ink pb-4 mb-5">
-          <div>
-            <h1 className="text-xl font-bold font-display tracking-tight">{company.name}</h1>
-            {company.address && <p className="text-slate-600 mt-0.5">{company.address}</p>}
-            {company.phone && <p className="text-slate-600">Telp: {company.phone}</p>}
+          <div className="flex items-start gap-3">
+            {company.logo && (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img src={company.logo} alt={company.name} className="w-14 h-14 object-contain flex-shrink-0" />
+            )}
+            <div>
+              <h1 className="text-xl font-bold font-display tracking-tight">{company.name}</h1>
+              {company.address && <p className="text-slate-600 mt-0.5 max-w-md">{company.address}</p>}
+              {company.phone && <p className="text-slate-600">Telp: {company.phone}</p>}
+            </div>
           </div>
           <div className="text-right">
             <p className="text-lg font-bold uppercase">{data.docType}</p>

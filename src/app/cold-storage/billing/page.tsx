@@ -7,7 +7,7 @@ import { DocumentPrintView, type DocumentPrintData } from '@/components/document
 import { useSession } from '@/hooks/use-session'
 import { useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabase/client'
-import { Search, DollarSign, Loader2, Printer } from 'lucide-react'
+import { Search, DollarSign, Loader2, Printer, Plus, X } from 'lucide-react'
 
 type Billing = {
   id: string
@@ -29,17 +29,51 @@ type BillingLine = {
 }
 
 export default function BillingPage() {
-  const { roleName, loaded, organizationId } = useSession()
+  const { roleName, roleCode, loaded, organizationId } = useSession()
   const [data, setData] = useState<Billing[]>([])
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
   const [printData, setPrintData] = useState<DocumentPrintData | null>(null)
   const [loadingPrint, setLoadingPrint] = useState(false)
 
+  const canIssue = roleCode === 'ADMIN' || roleCode === 'DIRECTOR' || roleCode === 'SYSTEM_ADMIN'
+  const [showIssue, setShowIssue] = useState(false)
+  const [contracts, setContracts] = useState<{ id: string; contract_number: string; customer: string | null }[]>([])
+  const [contractId, setContractId] = useState('')
+  const [issuing, setIssuing] = useState(false)
+  const [issueError, setIssueError] = useState<string | null>(null)
+
   useEffect(() => {
     if (!loaded) return
     fetchData()
   }, [loaded])
+
+  async function loadContracts() {
+    const { data: rows } = await supabase
+      .from('rental_contracts')
+      .select('id, contract_number, is_spot, rental_customers(name)')
+      .eq('organization_id', organizationId)
+      .order('created_at', { ascending: false })
+      .limit(200)
+    setContracts(
+      ((rows as unknown as { id: string; contract_number: string; is_spot: boolean; rental_customers: { name: string } | null }[]) || [])
+        .filter((c) => !c.is_spot)
+        .map((c) => ({ id: c.id, contract_number: c.contract_number, customer: c.rental_customers?.name ?? null }))
+    )
+  }
+
+  async function handleIssue(e: React.FormEvent) {
+    e.preventDefault()
+    if (!contractId) { setIssueError('Pilih kontrak dulu.'); return }
+    setIssuing(true)
+    setIssueError(null)
+    const { error } = await supabase.rpc('calculate_rental_billing', { p_contract_id: contractId })
+    setIssuing(false)
+    if (error) { setIssueError(error.message); return }
+    setShowIssue(false)
+    setContractId('')
+    fetchData()
+  }
 
   async function fetchData() {
     setLoading(true)
@@ -103,6 +137,14 @@ export default function BillingPage() {
             <h1 className="text-2xl font-bold text-slate-800 font-display">Billing</h1>
             <p className="mt-1 text-sm text-slate-500">Tagihan dan invoice rental cold storage</p>
           </div>
+          {canIssue && (
+            <button
+              onClick={() => { setShowIssue(true); loadContracts() }}
+              className="flex items-center gap-2 px-4 py-2 bg-primary hover:bg-primary/90 text-white text-sm font-medium rounded-lg transition-colors"
+            >
+              <Plus className="w-4 h-4" /> Terbitkan Invoice
+            </button>
+          )}
         </div>
 
         <div className="relative mb-4">
@@ -163,6 +205,34 @@ export default function BillingPage() {
         ) : (
           <DocumentPrintView data={printData} onClose={() => setPrintData(null)} />
         )}
+      </Modal>
+
+      {/* Terbitkan invoice */}
+      <Modal open={showIssue} onClose={() => setShowIssue(false)} title="Terbitkan Invoice Billing" size="md">
+        <form onSubmit={handleIssue} className="space-y-4">
+          {issueError && (
+            <div className="p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700">{issueError}</div>
+          )}
+          <div>
+            <label className="block text-sm font-medium text-slate-700 mb-1">Pilih Kontrak</label>
+            <select value={contractId} onChange={(e) => setContractId(e.target.value)} className="w-full border border-slate-200 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary">
+              <option value="">-- Pilih kontrak --</option>
+              {contracts.map((c) => (
+                <option key={c.id} value={c.id}>{c.contract_number}{c.customer ? ` — ${c.customer}` : ''}</option>
+              ))}
+            </select>
+            {contracts.length === 0 && <p className="text-xs text-slate-400 mt-1">Tidak ada kontrak rental.</p>}
+          </div>
+          <p className="text-xs text-slate-400">
+            Invoice dihitung otomatis dari berat barang &amp; lama penyimpanan (per kg/hari) untuk periode tagih berjalan.
+          </p>
+          <div className="flex justify-end gap-3 pt-2">
+            <button type="button" onClick={() => setShowIssue(false)} className="px-4 py-2 text-sm text-slate-600 hover:bg-slate-100 rounded-lg"><X className="w-4 h-4 inline mr-1" />Batal</button>
+            <button type="submit" disabled={issuing || !contractId} className="flex items-center gap-2 px-5 py-2.5 bg-primary hover:bg-primary/90 text-white text-sm font-medium rounded-lg disabled:opacity-60">
+              {issuing ? <Loader2 className="w-4 h-4 animate-spin" /> : <Plus className="w-4 h-4" />} Terbitkan
+            </button>
+          </div>
+        </form>
       </Modal>
     </AppShell>
   )

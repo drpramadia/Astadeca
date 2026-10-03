@@ -1,6 +1,7 @@
 'use client'
 
 import AppShell from '@/components/app-shell'
+import { AccessDenied } from '@/components/access-denied'
 import { StatusBadge } from '@/components/ui/status-badge'
 import { Modal } from '@/components/ui/modal'
 import { useSession } from '@/hooks/use-session'
@@ -23,6 +24,59 @@ import {
 type InspectionType = 'IN' | 'OUT'
 type Condition = 'GOOD' | 'DAMAGED' | 'REJECTED'
 
+// Kategori barang + checklist kualitas (memengaruhi keputusan otomatis)
+type Category = 'DAGING' | 'SAYUR' | 'BUAH' | 'SEAFOOD' | 'LAIN'
+
+type ChecklistItem = { key: string; label: string; rejectIfTrue?: boolean }
+
+const CATEGORY_LABELS: Record<Category, string> = {
+  DAGING: 'Daging',
+  SAYUR: 'Sayuran',
+  BUAH: 'Buah',
+  SEAFOOD: 'Seafood',
+  LAIN: 'Lain-lain',
+}
+
+// Item checklist per kategori. rejectIfTrue = jika dicentang, barang GAGAL.
+const CHECKLISTS: Record<Category, ChecklistItem[]> = {
+  DAGING: [
+    { key: 'bau_busuk', label: 'Bau busuk / tidak segar', rejectIfTrue: true },
+    { key: 'warna_biru', label: 'Warna kebiruan / kehijauan abnormal', rejectIfTrue: true },
+    { key: 'lendir', label: 'Berlendir / lembek', rejectIfTrue: true },
+    { key: 'bau_obat', label: 'Bau obat / kimia', rejectIfTrue: true },
+    { key: 'warna_normal', label: 'Warna merah segar normal' },
+    { key: 'beku_sempurna', label: 'Beku sempurna (tidak ada bagian mencair)' },
+  ],
+  SAYUR: [
+    { key: 'kuning_membusuk', label: 'Daun kuning / membusuk', rejectIfTrue: true },
+    { key: 'berlendir', label: 'Berlendir / hancur', rejectIfTrue: true },
+    { key: 'bau_tidak_sedap', label: 'Bau tidak sedap', rejectIfTrue: true },
+    { key: 'warna_hijau_segar', label: 'Warna hijau segar normal' },
+    { key: 'beku_sempurna', label: 'Beku sempurna' },
+  ],
+  BUAH: [
+    { key: 'jamur', label: 'Berjamur / bercak busuk', rejectIfTrue: true },
+    { key: 'berlendir', label: 'Berlendir / terlalu lunak', rejectIfTrue: true },
+    { key: 'bau_fermentasi', label: 'Bau fermentasi / asam', rejectIfTrue: true },
+    { key: 'warna_normal', label: 'Warna sesuai jenis buah' },
+    { key: 'beku_sempurna', label: 'Beku sempurna' },
+  ],
+  SEAFOOD: [
+    { key: 'bau_amoniak', label: 'Bau amoniak / menyengat', rejectIfTrue: true },
+    { key: 'mata_keruh', label: 'Mata keruh / insang coklat (ikan)', rejectIfTrue: true },
+    { key: 'daging_lunak', label: 'Daging lunak / tidak kenyal', rejectIfTrue: true },
+    { key: 'warna_cerah', label: 'Warna cerah normal' },
+    { key: 'beku_sempurna', label: 'Beku sempurna' },
+  ],
+  LAIN: [
+    { key: 'kemasan_rusak', label: 'Kemasan rusak / bocor', rejectIfTrue: true },
+    { key: 'bau_asing', label: 'Bau asing / tidak sedap', rejectIfTrue: true },
+    { key: 'kontaminasi', label: 'Tanda kontaminasi', rejectIfTrue: true },
+    { key: 'kemasan_baik', label: 'Kemasan baik & utuh' },
+    { key: 'beku_sempurna', label: 'Beku sempurna' },
+  ],
+}
+
 type QC = {
   id: string
   inspection_type: InspectionType | null
@@ -41,23 +95,35 @@ type QCRef = { id: string; label: string }
 type LineDraft = {
   item_name: string
   quantity_kg: string
+  category: Category
+  checks: Record<string, boolean>
   condition: Condition
   notes: string
   photo: File | null
 }
 
+/** Hitung keputusan otomatis dari checklist. */
+function computeVerdict(category: Category, checks: Record<string, boolean>): Condition {
+  const items = CHECKLISTS[category]
+  for (const it of items) {
+    if (it.rejectIfTrue && checks[it.key]) return 'REJECTED'
+  }
+  return 'GOOD'
+}
+
 const CONDITION_LABELS: Record<Condition, string> = {
-  GOOD: 'Baik',
+  GOOD: 'Baik / Lolos',
   DAMAGED: 'Rusak',
-  REJECTED: 'Ditolak',
+  REJECTED: 'Ditolak / Gagal',
 }
 
 function emptyLine(): LineDraft {
-  return { item_name: '', quantity_kg: '', condition: 'GOOD', notes: '', photo: null }
+  return { item_name: '', quantity_kg: '', category: 'LAIN', checks: {}, condition: 'GOOD', notes: '', photo: null }
 }
 
 export default function QCPage() {
-  const { loaded, organizationId, userId, name } = useSession()
+  const { loaded, organizationId, userId, name, roleCode } = useSession()
+  const canAccess = roleCode === 'WAREHOUSE' || roleCode === 'SYSTEM_ADMIN'
   const [data, setData] = useState<QC[]>([])
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
@@ -181,14 +247,23 @@ export default function QCPage() {
       return
     }
 
-    const prepared: Record<string, unknown>[] = validLines.map((l, i) => ({
-      inspection_id: header.id,
-      item_name: l.item_name.trim(),
-      quantity_kg: parseFloat(l.quantity_kg) || 0,
-      condition: l.condition,
-      notes: l.notes || null,
-      photo_url: uploadedUrls[i],
-    }))
+    // Status header ditentukan otomatis dari checklist masing-masing item
+    const overallFailed = validLines.some((l) => computeVerdict(l.category, l.checks) !== 'GOOD')
+
+    const prepared: Record<string, unknown>[] = validLines.map((l, i) => {
+      const verdict = computeVerdict(l.category, l.checks)
+      return {
+        inspection_id: header.id,
+        item_name: l.item_name.trim(),
+        quantity_kg: parseFloat(l.quantity_kg) || 0,
+        category: l.category,
+        checklist: l.checks,
+        auto_verdict: verdict,
+        condition: verdict,
+        notes: l.notes || null,
+        photo_url: uploadedUrls[i],
+      }
+    })
 
     const { error: lineErr } = await supabase.from('qc_inspection_lines').insert(prepared)
     if (lineErr) {
@@ -197,6 +272,12 @@ export default function QCPage() {
       setError(lineErr.message)
       setSaving(false)
       return
+    }
+
+    // Selaraskan status header dengan hasil checklist
+    const finalStatus = overallFailed ? 'FAILED' : 'PASSED'
+    if (finalStatus !== status) {
+      await supabase.from('qc_inspections').update({ status: finalStatus }).eq('id', header.id)
     }
 
     setSaving(false)
@@ -220,9 +301,11 @@ export default function QCPage() {
       r.profiles?.full_name?.toLowerCase().includes(q) ||
       r.notes?.toLowerCase().includes(q)
     )
-  })
+    })
 
-  return (
+    if (loaded && !canAccess) return <AccessDenied message="Halaman QC hanya untuk Warehouse atau System Administrator." />
+
+    return (
     <AppShell>
       <div className="p-6 lg:p-8 max-w-7xl mx-auto">
         <div className="flex items-start justify-between mb-6">
@@ -335,11 +418,10 @@ export default function QCPage() {
               <input type="text" value={inspector} onChange={(e) => setInspector(e.target.value)} className="w-full border border-slate-200 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary" />
             </div>
             <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1">Hasil Inspeksi</label>
-              <select value={status} onChange={(e) => setStatus(e.target.value as 'PASSED' | 'FAILED')} className="w-full border border-slate-200 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary">
-                <option value="PASSED">PASSED (Lolos)</option>
-                <option value="FAILED">FAILED (Gagal)</option>
-              </select>
+              <label className="block text-sm font-medium text-slate-700 mb-1">Hasil Inspeksi (otomatis)</label>
+              <div className="w-full border border-slate-200 rounded-lg px-3 py-2.5 text-sm bg-slate-50 text-slate-600">
+                Ditentukan otomatis dari checklist tiap barang
+              </div>
             </div>
             <div>
               <label className="block text-sm font-medium text-slate-700 mb-1">Catatan</label>
@@ -356,57 +438,85 @@ export default function QCPage() {
             </div>
 
             <div className="space-y-3">
-              {lines.map((l, idx) => (
-                <div key={idx} className="grid grid-cols-12 gap-2 items-start bg-slate-50 rounded-lg p-3">
-                  <input
-                    className="col-span-12 sm:col-span-4 border border-slate-200 rounded-lg px-3 py-2 text-sm"
-                    placeholder="Nama barang"
-                    value={l.item_name}
-                    onChange={(e) => updateLine(idx, { item_name: e.target.value })}
-                  />
-                  <input
-                    className="col-span-6 sm:col-span-2 border border-slate-200 rounded-lg px-3 py-2 text-sm"
-                    placeholder="Qty (kg)"
-                    type="number"
-                    step="0.01"
-                    value={l.quantity_kg}
-                    onChange={(e) => updateLine(idx, { quantity_kg: e.target.value })}
-                  />
-                  <select
-                    className="col-span-6 sm:col-span-2 border border-slate-200 rounded-lg px-3 py-2 text-sm"
-                    value={l.condition}
-                    onChange={(e) => updateLine(idx, { condition: e.target.value as Condition })}
-                  >
-                    {Object.entries(CONDITION_LABELS).map(([code, label]) => (
-                      <option key={code} value={code}>{label}</option>
-                    ))}
-                  </select>
-                  <label className={`col-span-10 sm:col-span-3 flex items-center gap-2 border rounded-lg px-3 py-2 text-sm cursor-pointer bg-white ${activeTab === 'IN' && !l.photo ? 'border-amber-300 text-amber-700' : 'border-slate-200 text-slate-500'}`}>
-                    <ImagePlus className="w-4 h-4 flex-shrink-0" />
-                    <span className="truncate">{l.photo ? l.photo.name : (activeTab === 'IN' ? 'Foto (wajib)' : 'Foto (opsional)')}</span>
+              {lines.map((l, idx) => {
+                const verdict = computeVerdict(l.category, l.checks)
+                const verdictStyle = verdict === 'GOOD'
+                  ? 'bg-green-50 border-green-200 text-green-700'
+                  : 'bg-red-50 border-red-200 text-red-700'
+                return (
+                <div key={idx} className="bg-slate-50 rounded-lg p-3 space-y-3">
+                  <div className="grid grid-cols-12 gap-2 items-start">
                     <input
-                      type="file"
-                      accept="image/*"
-                      className="hidden"
-                      onChange={(e) => updateLine(idx, { photo: e.target.files?.[0] ?? null })}
+                      className="col-span-12 sm:col-span-4 border border-slate-200 rounded-lg px-3 py-2 text-sm"
+                      placeholder="Nama barang"
+                      value={l.item_name}
+                      onChange={(e) => updateLine(idx, { item_name: e.target.value })}
                     />
-                  </label>
-                  <button
-                    type="button"
-                    onClick={() => setLines((p) => p.filter((_, i) => i !== idx))}
-                    disabled={lines.length === 1}
-                    className="col-span-2 sm:col-span-1 flex items-center justify-center text-red-500 hover:bg-red-50 rounded-lg py-2 disabled:opacity-30"
-                  >
-                    <Trash2 className="w-4 h-4" />
-                  </button>
+                    <input
+                      className="col-span-6 sm:col-span-2 border border-slate-200 rounded-lg px-3 py-2 text-sm"
+                      placeholder="Qty (kg)"
+                      type="number"
+                      step="0.01"
+                      value={l.quantity_kg}
+                      onChange={(e) => updateLine(idx, { quantity_kg: e.target.value })}
+                    />
+                    <select
+                      className="col-span-6 sm:col-span-2 border border-slate-200 rounded-lg px-3 py-2 text-sm"
+                      value={l.category}
+                      onChange={(e) => updateLine(idx, { category: e.target.value as Category, checks: {} })}
+                    >
+                      {Object.entries(CATEGORY_LABELS).map(([code, label]) => (
+                        <option key={code} value={code}>{label}</option>
+                      ))}
+                    </select>
+                    <label className={`col-span-10 sm:col-span-3 flex items-center gap-2 border rounded-lg px-3 py-2 text-sm cursor-pointer bg-white ${activeTab === 'IN' && !l.photo ? 'border-amber-300 text-amber-700' : 'border-slate-200 text-slate-500'}`}>
+                      <ImagePlus className="w-4 h-4 flex-shrink-0" />
+                      <span className="truncate">{l.photo ? l.photo.name : (activeTab === 'IN' ? 'Foto (wajib)' : 'Foto (opsional)')}</span>
+                      <input
+                        type="file"
+                        accept="image/*"
+                        className="hidden"
+                        onChange={(e) => updateLine(idx, { photo: e.target.files?.[0] ?? null })}
+                      />
+                    </label>
+                    <button
+                      type="button"
+                      onClick={() => setLines((p) => p.filter((_, i) => i !== idx))}
+                      disabled={lines.length === 1}
+                      className="col-span-2 sm:col-span-1 flex items-center justify-center text-red-500 hover:bg-red-50 rounded-lg py-2 disabled:opacity-30"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                  </div>
+
+                  {/* Checklist kualitas sesuai kategori */}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-1.5">
+                    {CHECKLISTS[l.category].map((item) => (
+                      <label key={item.key} className="flex items-center gap-2 text-xs text-slate-600 cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={!!l.checks[item.key]}
+                          onChange={(e) => updateLine(idx, { checks: { ...l.checks, [item.key]: e.target.checked } })}
+                          className="rounded border-slate-300 text-primary focus:ring-primary"
+                        />
+                        <span className={item.rejectIfTrue ? 'text-slate-600' : ''}>{item.label}</span>
+                      </label>
+                    ))}
+                  </div>
+
+                  <div className={`inline-flex items-center rounded-lg border px-3 py-1 text-xs font-semibold ${verdictStyle}`}>
+                    Hasil otomatis: {CONDITION_LABELS[verdict]}
+                  </div>
+
                   <input
-                    className="col-span-12 border border-slate-200 rounded-lg px-3 py-2 text-xs"
+                    className="w-full border border-slate-200 rounded-lg px-3 py-2 text-xs bg-white"
                     placeholder="Catatan item (opsional)"
                     value={l.notes}
                     onChange={(e) => updateLine(idx, { notes: e.target.value })}
                   />
                 </div>
-              ))}
+                )
+              })}
             </div>
           </div>
 

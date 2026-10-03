@@ -1,6 +1,7 @@
 'use client'
 
 import AppShell from '@/components/app-shell'
+import { AccessDenied } from '@/components/access-denied'
 import { useSession } from '@/hooks/use-session'
 import { useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabase/client'
@@ -25,7 +26,8 @@ type MonthlySummary = {
 }
 
 export default function FinanceReportsPage() {
-  const { organizationId, loaded } = useSession()
+  const { organizationId, loaded, roleCode } = useSession()
+  const canAccess = roleCode === 'ADMIN' || roleCode === 'DIRECTOR' || roleCode === 'SYSTEM_ADMIN'
   const [data, setData] = useState<Transaction[]>([])
   const [loading, setLoading] = useState(true)
   const [dateFilter, setDateFilter] = useState('')
@@ -73,9 +75,11 @@ export default function FinanceReportsPage() {
   const totalCredit = data.filter((t) => t.type === 'CREDIT').reduce((sum, t) => sum + Number(t.amount), 0)
   const balance = totalCredit - totalDebit
 
-  const maxAmount = Math.max(...monthlySummary.map((m) => Math.max(m.credit, m.debit)), 1)
+    const maxAmount = Math.max(...monthlySummary.map((m) => Math.max(m.credit, m.debit)), 1)
 
-  return (
+    if (loaded && !canAccess) return <AccessDenied message="Laporan keuangan hanya untuk Admin, Director, atau System Administrator." />
+
+    return (
     <AppShell>
       <div className="p-6 lg:p-8 max-w-7xl mx-auto">
         <div className="flex items-start justify-between mb-6">
