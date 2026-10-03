@@ -16,3 +16,6 @@ tsconfig.tsbuildinfo
 
 # Supabase CLI local state
 supabase/.temp/
+
+# Template env (boleh di-commit, tanpa nilai rahasia)
+!.env.example
