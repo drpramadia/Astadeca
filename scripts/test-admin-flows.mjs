@@ -48,7 +48,7 @@ async function patch(table, q, rows) {
   return { status: r.status, body: await r.json().catch(() => null) }
 }
 
-const cleanup = { rental_contracts: [], purchase_orders: [], sales_orders: [], delivery_requests: [] }
+const cleanup = { rental_contracts: [], purchase_orders: [], sales_orders: [], delivery_requests: [], rental_customers: [] }
 
 try {
   check('login sebagai ADMIN (gian)', await login())
@@ -62,8 +62,10 @@ try {
     TOKEN_DIR = (await r.json()).access_token || ''
   }
 
-  // Referensi
-  const cust = (await sel('rental_customers', `select=id&organization_id=eq.${ORG}&limit=1`)).body?.[0]
+  // Referensi (penyewa sewa dibuat sendiri agar test self-contained)
+  const custIns = await ins('rental_customers', [{ organization_id: ORG, name: 'Penyewa Admin (UJI)', phone: '0800-0003' }])
+  const cust = custIns.body?.[0]
+  if (cust?.id) cleanup.rental_customers.push(cust.id)
   const cs = (await sel('cold_storages', `select=id&organization_id=eq.${ORG}&limit=1`)).body?.[0]
   const product = (await sel('products', `select=id&organization_id=eq.${ORG}&limit=1`)).body?.[0]
   const supplier = (await sel('suppliers', `select=id&organization_id=eq.${ORG}&limit=1`)).body?.[0]
@@ -178,6 +180,7 @@ try {
   for (const id of cleanup.sales_orders) await fetch(`${URL}/rest/v1/sales_orders?id=eq.${id}`, { method: 'DELETE', headers: svcH })
   for (const id of cleanup.purchase_orders) await fetch(`${URL}/rest/v1/purchase_orders?id=eq.${id}`, { method: 'DELETE', headers: svcH })
   for (const id of cleanup.rental_contracts) await fetch(`${URL}/rest/v1/rental_contracts?id=eq.${id}`, { method: 'DELETE', headers: svcH })
+  for (const id of cleanup.rental_customers) await fetch(`${URL}/rest/v1/rental_customers?id=eq.${id}`, { method: 'DELETE', headers: svcH })
   console.log('\nData uji dibersihkan.')
 }
 

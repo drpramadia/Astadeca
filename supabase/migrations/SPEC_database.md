@@ -107,6 +107,15 @@
 - Snapshot harian (`refresh_daily_usage_*`) tetap berjalan otomatis agar
   kg per hari tetap tercatat.
 
+## Sinkronisasi Penjualan/Pembelian -> Keuangan (per migrasi 028)
+- `sync_po_finance(id)` / `sync_so_finance(id)` menghitung ulang total dari
+  lines, menulis `total_amount` pada header, dan membuat/menyesuaikan transaksi
+  (DEBIT untuk PO, CREDIT untuk SO) saat status APPROVED — idempoten (tidak dobel).
+- Trigger dipasang pada header (insert/update status/total) DAN pada lines
+  (insert/update/delete) sehingga total & transaksi selalu konsisten, termasuk
+  saat dokumen dibuat langsung APPROVED (lines menyusul) atau lines diubah.
+- Backfill dijalankan sekali untuk menyelaraskan data lama.
+
 ## Monitoring & Notifikasi Penagihan (per migrasi 026)
 - `notify_rental_billing_due(org_id)` mengirim notifikasi ke ADMIN/DIRECTOR/
   SYSTEM_ADMIN untuk invoice SENT (pengingat) & OVERDUE (jatuh tempo).
