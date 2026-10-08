@@ -15,7 +15,7 @@ type Contract = {
   contract_number: string
   status: string
   start_date: string
-  end_date: string
+  end_date: string | null
   price_per_kg_per_day: number
   notes: string | null
   created_at: string
@@ -67,7 +67,7 @@ export default function ContractsPage() {
       meta: [
         { label: 'Customer', value: row.rental_customers?.name ?? '-' },
         { label: 'Cold Storage', value: row.cold_storages?.name ?? '-' },
-        { label: 'Periode', value: `${new Date(row.start_date).toLocaleDateString('id-ID')} - ${new Date(row.end_date).toLocaleDateString('id-ID')}` },
+        { label: 'Periode', value: `${new Date(row.start_date).toLocaleDateString('id-ID')} - ${row.end_date ? new Date(row.end_date).toLocaleDateString('id-ID') : '-'}` },
         { label: 'Tarif per Kg/Hari', value: `Rp ${Number(row.price_per_kg_per_day).toLocaleString('id-ID')}` },
       ],
       lines: [
@@ -161,7 +161,7 @@ export default function ContractsPage() {
                     <td className="px-4 py-3 text-slate-600">{row.cold_storages?.name ?? '-'}</td>
                     <td className="px-4 py-3 text-right font-mono text-slate-700">Rp {row.price_per_kg_per_day.toLocaleString('id-ID')}</td>
                     <td className="px-4 py-3 text-center text-xs text-slate-500">
-                      {new Date(row.start_date).toLocaleDateString('id-ID')} - {new Date(row.end_date).toLocaleDateString('id-ID')}
+                      {new Date(row.start_date).toLocaleDateString('id-ID')} - {row.end_date ? new Date(row.end_date).toLocaleDateString('id-ID') : '-'}
                     </td>
                     <td className="px-4 py-3 text-center">
                       <StatusBadge status={row.status} />

@@ -75,6 +75,18 @@
 - release_inventory(...) — creates movement OUT
 - apply_qc_inspection(...) — updates GR + inventory status
 
+## Aturan Sewa Cold Storage (per migrasi 022)
+- Barang dapat dikeluarkan kapan saja: TIDAK ada gate "harus lunas" dan
+  TIDAK ada approval Director untuk pengeluaran barang (RENTAL_RELEASE).
+- Penagihan otomatis mengikuti perjanjian kontrak:
+  `calculate_rental_billing` menghitung dari barang aktual di gudang ×
+  `price_per_kg_per_day`, dengan MINIMUM 1 TON. Bila saldo barang < 1.000 kg,
+  kg ditagih = 1.000 kg. Diatur per kontrak via kolom `minimum_1_ton`
+  (default true). Periode tagih dari `organization_settings.rental.billing_period_days`
+  (default 7 = mingguan).
+- Input perjanjian penagihan dilakukan saat membuat kontrak (form kontrak):
+  tarif per kg/hari + opsi minimum 1 ton.
+
 ## Permissions
 ADMIN: rental.*, inventory.*, purchase.*, sales.*, finance.*, admin.*, documents.*, reports.*
 WAREHOUSE: inventory.view, inventory.receive, inventory.issue, qc.*

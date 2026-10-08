@@ -93,27 +93,27 @@ try {
   const rec1 = await ins('rental_receivings', { organization_id: ORG, contract_id: created.contract, received_kg: 600, batch_number: 'B-001', received_at: new Date().toISOString(), expiry_date: expiry, received_by: s.userId }, T)
   check('3. barang masuk batch B-001 (600 kg, expiry dekat)', rec1.status === 201, `status=${rec1.status}`)
   if (Array.isArray(rec1.body)) rec1.body.forEach((x) => created.receivings.push(x.id))
-  const rec2 = await ins('rental_receivings', { organization_id: ORG, contract_id: created.contract, received_kg: 400, batch_number: 'B-002', received_at: new Date().toISOString(), expiry_date: new Date(Date.now() + 60 * 864e5).toISOString().slice(0, 10), received_by: s.userId }, T)
-  check('3. barang masuk batch B-002 (400 kg)', rec2.status === 201, `status=${rec2.status}`)
+  const rec2 = await ins('rental_receivings', { organization_id: ORG, contract_id: created.contract, received_kg: 300, batch_number: 'B-002', received_at: new Date().toISOString(), expiry_date: new Date(Date.now() + 60 * 864e5).toISOString().slice(0, 10), received_by: s.userId }, T)
+  check('3. barang masuk batch B-002 (300 kg)', rec2.status === 201, `status=${rec2.status}`)
   if (Array.isArray(rec2.body)) rec2.body.forEach((x) => created.receivings.push(x.id))
 
-  // ============ 4. TAGIHAN MINGGUAN + BAYAR, lalu BARANG KELUAR ============
+  // ============ 4. TAGIHAN MINGGUAN OTOMATIS (min 1 ton) ============
   const bill = await rpc('calculate_rental_billing', { p_contract_id: created.contract }, T)
   const b = Array.isArray(bill.body) ? bill.body[0] : bill.body
-  check('4. invoice mingguan terbit otomatis (saat barang masuk)', bill.status === 200 && !!b?.out_invoice_number, `inv=${b?.out_invoice_number} total=${b?.out_total_amount}`)
+  check('4. invoice mingguan terbit (ikuti perjanjian kontrak)', bill.status === 200 && !!b?.out_invoice_number, `inv=${b?.out_invoice_number} total=${b?.out_total_amount}`)
   const billing = await sel('rental_billing', `contract_id=eq.${created.contract}&select=id,invoice_number,period_start,period_end,total_amount,status`, T)
   const bl = billing?.[0]
   check('4. periode = 7 hari (mingguan)', bl ? Math.round((new Date(bl.period_end) - new Date(bl.period_start)) / 864e5) === 6 : false, bl ? `${bl.period_start}..${bl.period_end}` : '')
-  if (bl?.id) {
-    const pay = await fetch(`${URL}/rest/v1/rental_billing?id=eq.${bl.id}`, { method: 'PATCH', headers: H(T), body: JSON.stringify({ status: 'PAID' }) })
-    check('4. bayar tagihan (lunas)', pay.status === 204 || pay.status === 200, `status=${pay.status}`)
-  }
+
+  // 900 kg aktual (< 1 ton) selama periode 7 hari -> min 1 ton dipakai: 7 x 1.000 kg
   const lines = bl?.id ? await sel('rental_billing_lines', `billing_id=eq.${bl.id}&select=description,quantity_kg,price_per_kg,subtotal`, T) : []
   check('4. ada rincian tagihan', (lines || []).length > 0, `${(lines || []).length} baris`)
+  const billedKgDay = Number(lines?.[0]?.quantity_kg ?? 0)
+  check('4. min 1 ton benar-benar diterapkan (900 kg -> ditagih 1.000/hari)', billedKgDay >= 7000, `kg-hari=${billedKgDay} tarif=${lines?.[0]?.price_per_kg}`)
 
-  // release-gate: pembayaran sudah lunas -> barang boleh keluar
-  const rel = await ins('rental_releases', { organization_id: ORG, contract_id: created.contract, released_kg: 580, batch_number: 'B-001', released_at: new Date().toISOString(), notes: 'Pengeluaran sebagian' }, T)
-  check('4. barang keluar 580 kg setelah lunas (release-gate lolos)', rel.status === 201, `status=${rel.status}`)
+  // release TANPA gate: tidak perlu bayar / approval, barang boleh keluar kapan saja
+  const rel = await ins('rental_releases', { organization_id: ORG, contract_id: created.contract, released_kg: 580, batch_number: 'B-001', released_at: new Date().toISOString(), notes: 'Pengeluaran sebagian (tanpa gate)' }, T)
+  check('4. barang keluar tanpa gate/approval (boleh walau belum bayar)', rel.status === 201, `status=${rel.status}`)
   if (Array.isArray(rel.body)) rel.body.forEach((x) => created.releases.push(x.id))
 
   // ============ 5. CATAT WASTE ============
@@ -127,10 +127,10 @@ try {
 
   console.log('\nRingkasan sewa cold storage:')
   console.log(`  Kontrak        : ${contractNumber} (Rp 100/kg/hari)`)
-  console.log(`  Barang masuk   : 1.000 kg (B-001: 600, B-002: 400)`)
-  console.log(`  Barang keluar  : 580 kg (setelah tagihan dilunasi)`)
+  console.log(`  Barang masuk   : 900 kg (B-001: 600, B-002: 300) — di bawah 1 ton`)
+  console.log(`  Barang keluar  : 580 kg (tanpa gate/approval)`)
   console.log(`  Waste dicatat  : 20 kg (susut)`)
-  console.log(`  Invoice        : ${bl?.invoice_number ?? '-'} = Rp ${Number(bl?.total_amount ?? 0).toLocaleString('id-ID')} (LUNAS)`)
+  console.log(`  Invoice        : ${bl?.invoice_number ?? '-'} = Rp ${Number(bl?.total_amount ?? 0).toLocaleString('id-ID')} (min 1 ton)`)
 } catch (e) {
   console.error('ERROR:', e.message)
   process.exitCode = 1

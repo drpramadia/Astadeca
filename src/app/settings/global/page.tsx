@@ -46,11 +46,7 @@ const FIELDS: { group: string; icon: React.ElementType; items: FieldDef[] }[] = 
     icon: PackageCheck,
     items: [
       {
-        key: 'rental.require_paid_before_release', label: 'Harus Lunas dulu', description: 'Barang tidak bisa keluar sebelum tagihan lunas.', type: 'select',
-        options: [{ value: 'true', label: 'Ya' }, { value: 'false', label: 'Tidak' }],
-      },
-      {
-        key: 'rental.require_approval_release', label: 'Approval Pengeluaran', description: 'Pengeluaran barang wajib approval director.', type: 'select',
+        key: 'rental.minimum_1_ton', label: 'Minimum Tagih 1 Ton', description: 'Bila aktif, barang di bawah 1 ton tetap ditagih 1 ton per hari berisi stok.', type: 'select',
         options: [{ value: 'true', label: 'Ya' }, { value: 'false', label: 'Tidak' }],
       },
     ],

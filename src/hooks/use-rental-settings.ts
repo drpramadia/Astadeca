@@ -10,8 +10,7 @@ export type RentalSettings = {
   expiry_alert_days: number
   spot_mode: string
   excess_policy: string
-  require_paid_before_release: boolean
-  require_approval_release: boolean
+  minimum_1_ton: boolean
 }
 
 export const DEFAULT_RENTAL_SETTINGS: RentalSettings = {
@@ -21,8 +20,7 @@ export const DEFAULT_RENTAL_SETTINGS: RentalSettings = {
   expiry_alert_days: 3,
   spot_mode: 'UPFRONT',
   excess_policy: 'CARRY_OVER',
-  require_paid_before_release: true,
-  require_approval_release: true,
+  minimum_1_ton: true,
 }
 
 /** Baca pengaturan global rental dari organization_settings. */
@@ -48,8 +46,7 @@ export function useRentalSettings(organizationId: string | null) {
           expiry_alert_days: map['rental.expiry_alert_days'] ? Number(map['rental.expiry_alert_days']) : DEFAULT_RENTAL_SETTINGS.expiry_alert_days,
           spot_mode: map['rental.spot_mode'] || DEFAULT_RENTAL_SETTINGS.spot_mode,
           excess_policy: map['rental.excess_policy'] || DEFAULT_RENTAL_SETTINGS.excess_policy,
-          require_paid_before_release: map['rental.require_paid_before_release'] !== 'false',
-          require_approval_release: map['rental.require_approval_release'] !== 'false',
+          minimum_1_ton: map['rental.minimum_1_ton'] !== 'false',
         })
         setLoaded(true)
       })
