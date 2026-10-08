@@ -18,8 +18,7 @@ type Billing = {
   period_start: string
   period_end: string
   created_at: string
-  rental_contracts: { contract_number: string } | null
-  rental_customers: { name: string } | null
+  rental_contracts: { contract_number: string; rental_customers: { name: string } | null } | null
 }
 
 type BillingLine = {
@@ -43,6 +42,7 @@ export default function BillingPage() {
   const [contractId, setContractId] = useState('')
   const [issuing, setIssuing] = useState(false)
   const [issueError, setIssueError] = useState<string | null>(null)
+  const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
     if (!loaded) return
@@ -91,13 +91,15 @@ export default function BillingPage() {
 
   async function fetchData() {
     setLoading(true)
-    const { data: rows } = await supabase
+    const { data: rows, error } = await supabase
       .from('rental_billing')
-      .select('*, rental_contracts(contract_number), rental_contracts(rental_customers(name))')
+      .select('*, rental_contracts(contract_number, rental_customers(name))')
       .eq('organization_id', organizationId)
       .order('created_at', { ascending: false })
       .limit(100)
-    setData((rows as Billing[]) || [])
+    if (error) { setError(error.message); setData([]); setLoading(false); return }
+    setError(null)
+    setData((rows as unknown as Billing[]) || [])
     setLoading(false)
   }
 
@@ -109,7 +111,7 @@ export default function BillingPage() {
       .select('description, quantity_kg, price_per_kg, subtotal')
       .eq('billing_id', row.id)
     const lines = (lineRows as BillingLine[] | null) || []
-    const customer = (row as Billing & { rental_customers?: { name: string } | null }).rental_customers
+    const customer = row.rental_contracts?.rental_customers
 
     setPrintData({
       docType: 'Invoice',
@@ -138,7 +140,7 @@ export default function BillingPage() {
     const q = search.toLowerCase()
     return (
       r.invoice_number?.toLowerCase().includes(q) ||
-      (r as any).rental_customers?.name?.toLowerCase().includes(q) ||
+      r.rental_contracts?.rental_customers?.name?.toLowerCase().includes(q) ||
       r.rental_contracts?.contract_number?.toLowerCase().includes(q)
     )
   })
@@ -166,6 +168,10 @@ export default function BillingPage() {
           <input type="text" placeholder="Cari invoice atau customer..." value={search} onChange={(e) => setSearch(e.target.value)} className="w-full pl-10 pr-4 py-2.5 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary" />
         </div>
 
+        {error && (
+          <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700">{error}</div>
+        )}
+
         <div className="bg-white rounded-xl border border-slate-200 overflow-hidden overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
@@ -192,7 +198,7 @@ export default function BillingPage() {
                       <Link href={`/cold-storage/billing/${row.id}`} className="text-cyan-700 hover:text-cyan-900 hover:underline">{row.invoice_number}</Link>
                     </td>
                     <td className="px-4 py-3 font-mono text-slate-600 text-xs">{row.rental_contracts?.contract_number ?? '-'}</td>
-                    <td className="px-4 py-3 font-medium text-slate-800">{(row as any).rental_customers?.name ?? '-'}</td>
+                    <td className="px-4 py-3 font-medium text-slate-800">{row.rental_contracts?.rental_customers?.name ?? '-'}</td>
                     <td className="px-4 py-3 text-right font-mono font-semibold text-slate-800">Rp {row.total_amount.toLocaleString('id-ID')}</td>
                     <td className="px-4 py-3 text-xs text-slate-500">
                       {new Date(row.period_start).toLocaleDateString('id-ID')} - {new Date(row.period_end).toLocaleDateString('id-ID')}
