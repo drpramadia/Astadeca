@@ -150,16 +150,38 @@
    dicetak lewat window.print(). Lihat src/lib/print.ts.
    ============================================================ */
 @media print {
+  /* Sembunyikan seluruh halaman, lalu tampilkan HANYA jalur menuju .print-target.
+     Semua ancestor .print-target dipaksa tampil (display:contents agar layout
+     tidak terpengaruh), dan .print-target sendiri jadi blok cetak. */
   body.printing > * {
     display: none !important;
+  }
+
+  body.printing .print-target,
+  body.printing .print-target * {
+    visibility: visible !important;
+  }
+
+  /* Tampilkan kembali rantai ancestor dari .print-target sampai ke <body>. */
+  body.printing .print-target-ancestor {
+    display: block !important;
+    position: static !important;
+    overflow: visible !important;
+    max-height: none !important;
+    width: auto !important;
+    height: auto !important;
+    background: transparent !important;
+    border: none !important;
+    box-shadow: none !important;
+    padding: 0 !important;
+    margin: 0 !important;
   }
 
   body.printing .print-target {
     display: block !important;
     position: static !important;
-  }
-
-  .print-target {
+    overflow: visible !important;
+    max-height: none !important;
     background: #fff !important;
   }
 

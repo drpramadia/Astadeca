@@ -37,6 +37,17 @@ export function printElement(elementId: string, documentTitle?: string): void {
   document.body.classList.add('printing')
   el.classList.add('print-target')
 
+  // Tandai seluruh ancestor sampai <body> agar baris CSS print bisa
+  // menampilkan kembali jalur menuju elemen cetak (mengatasi blank saat cetak
+  // karena parent-nya ikut disembunyikan).
+  const ancestors: HTMLElement[] = []
+  let node: HTMLElement | null = el.parentElement
+  while (node && node !== document.body) {
+    node.classList.add('print-target-ancestor')
+    ancestors.push(node)
+    node = node.parentElement
+  }
+
   let timer: number | undefined
   const cleanup = () => {
     if (timer !== undefined) {
@@ -45,6 +56,7 @@ export function printElement(elementId: string, documentTitle?: string): void {
     }
     document.body.classList.remove('printing')
     el.classList.remove('print-target')
+    ancestors.forEach((a) => a.classList.remove('print-target-ancestor'))
     document.title = previousTitle
     window.removeEventListener('afterprint', cleanup)
   }
