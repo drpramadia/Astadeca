@@ -35,7 +35,7 @@ export default function RolesPage() {
     setPermissions((p.data as Permission[]) || [])
     setRolePerms((rp.data as RolePerm[]) || [])
     const c: Record<string, number> = {}
-    ;(mem.data || []).forEach((m: any) => { c[m.role_id] = (c[m.role_id] || 0) + 1 })
+    ;(mem.data as { role_id: string }[] || []).forEach((m) => { c[m.role_id] = (c[m.role_id] || 0) + 1 })
     setCounts(c)
     setLoading(false)
   }

@@ -21,26 +21,30 @@ type Notification = {
 }
 
 export default function NotificationsPage() {
-  const { organizationId, loaded, roleCode } = useSession()
+  const { organizationId, userId, loaded, roleCode } = useSession()
   const router = useRouter()
   const [data, setData] = useState<Notification[]>([])
   const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
 
   const canApprove = roleCode === 'DIRECTOR' || roleCode === 'SYSTEM_ADMIN'
 
   useEffect(() => {
-    if (!loaded) return
+    if (!loaded || !userId) return
     fetchData()
-  }, [loaded])
+  }, [loaded, userId])
 
   async function fetchData() {
     setLoading(true)
-    const { data: rows } = await supabase
+    const { data: rows, error: qErr } = await supabase
       .from('notifications')
       .select('*')
       .eq('organization_id', organizationId)
+      .eq('recipient_user_id', userId)
       .order('created_at', { ascending: false })
       .limit(100)
+    if (qErr) { setError(qErr.message); setData([]); setLoading(false); return }
+    setError(null)
     setData((rows as Notification[]) || [])
     setLoading(false)
   }
@@ -102,6 +106,8 @@ export default function NotificationsPage() {
             <div className="text-center py-12 text-slate-400">
               <Loader2 className="w-6 h-6 animate-spin mx-auto" />
             </div>
+          ) : error ? (
+            <div className="p-3 m-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700">{error}</div>
           ) : data.length === 0 ? (
             <div className="text-center py-12 text-slate-400">
               <Bell className="w-8 h-8 mx-auto mb-2 opacity-30" />

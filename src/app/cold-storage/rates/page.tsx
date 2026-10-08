@@ -10,6 +10,7 @@ import { Plus, DollarSign, Loader2, Pencil, Trash2 } from 'lucide-react'
 
 type Rate = {
   id: string
+  cold_storage_id: string | null
   price_per_kg_per_day: number
   minimum_days: number
   minimum_kg: number
@@ -84,7 +85,7 @@ export default function RatesPage() {
   function startEdit(row: Rate) {
     setEditId(row.id)
     setFormData({
-      cold_storage_id: (row as any).cold_storage_id ?? '',
+      cold_storage_id: row.cold_storage_id ?? '',
       price_per_kg_per_day: row.price_per_kg_per_day.toString(),
       minimum_days: row.minimum_days.toString(),
       minimum_kg: row.minimum_kg.toString(),

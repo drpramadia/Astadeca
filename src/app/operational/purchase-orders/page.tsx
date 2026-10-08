@@ -37,6 +37,7 @@ export default function PurchaseOrdersPage() {
   const [statusFilter, setStatusFilter] = useState('')
   const [printData, setPrintData] = useState<DocumentPrintData | null>(null)
   const [loadingPrint, setLoadingPrint] = useState(false)
+  const [error, setError] = useState<string | null>(null)
   
 
   const canAccess = roleCode === 'DIRECTOR' || roleCode === 'ADMIN' || roleCode === 'SYSTEM_ADMIN'
@@ -55,7 +56,9 @@ export default function PurchaseOrdersPage() {
       .order('created_at', { ascending: false })
       .limit(100)
     if (statusFilter) q = q.eq('status', statusFilter)
-    const { data: rows } = await q
+    const { data: rows, error: qErr } = await q
+    if (qErr) { setError(qErr.message); setData([]); setLoading(false); return }
+    setError(null)
     setData((rows as PO[]) || [])
     setLoading(false)
   }
@@ -150,6 +153,10 @@ export default function PurchaseOrdersPage() {
             <option value="CANCELLED">Cancelled</option>
           </select>
         </div>
+
+        {error && (
+          <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700">{error}</div>
+        )}
 
         <div className="bg-white rounded-xl border border-slate-200 overflow-hidden overflow-x-auto">
           <table className="w-full text-sm">

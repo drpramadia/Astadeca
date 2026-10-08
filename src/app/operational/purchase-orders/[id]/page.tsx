@@ -40,6 +40,7 @@ export default function PurchaseOrderDetailPage() {
   const [lines, setLines] = useState<POLine[]>([])
   const [loading, setLoading] = useState(true)
   const [printData, setPrintData] = useState<DocumentPrintData | null>(null)
+  const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
     if (!loaded || !id || !canAccess) return
@@ -49,15 +50,18 @@ export default function PurchaseOrderDetailPage() {
 
   async function load() {
     setLoading(true)
-    const { data: header } = await supabase
+    const { data: header, error: hErr } = await supabase
       .from('purchase_orders')
       .select('*, suppliers(name), profiles(full_name)')
       .eq('id', id)
       .single()
-    const { data: lineRows } = await supabase
+    if (hErr) { setError(hErr.message); setPo(null); setLoading(false); return }
+    const { data: lineRows, error: lErr } = await supabase
       .from('purchase_order_lines')
       .select('quantity_kg, price_per_kg, subtotal, products(name, sku)')
       .eq('po_id', id)
+    if (lErr) { setError(lErr.message); setPo(null); setLoading(false); return }
+    setError(null)
     setPo(header as unknown as PO)
     setLines((lineRows as unknown as POLine[]) || [])
     setLoading(false)
@@ -97,6 +101,8 @@ export default function PurchaseOrderDetailPage() {
 
         {loading ? (
           <div className="text-center py-16 text-slate-400"><Loader2 className="w-6 h-6 animate-spin mx-auto" /></div>
+        ) : error ? (
+          <div className="p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700">{error}</div>
         ) : !po ? (
           <div className="text-center py-16 text-slate-400">Purchase Order tidak ditemukan.</div>
         ) : (

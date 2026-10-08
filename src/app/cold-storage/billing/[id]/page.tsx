@@ -42,19 +42,23 @@ export default function BillingDetailPage() {
   const [lines, setLines] = useState<BillingLine[]>([])
   const [loading, setLoading] = useState(true)
   const [printData, setPrintData] = useState<DocumentPrintData | null>(null)
+  const [error, setError] = useState<string | null>(null)
 
   const fetchData = useCallback(async () => {
     if (!billingId || !organizationId) return
     setLoading(true)
-    const { data } = await supabase
+    const { data, error: hErr } = await supabase
       .from('rental_billing')
       .select('*, rental_contracts(contract_number, rental_customers(name), cold_storages(name))')
       .eq('id', billingId)
       .single()
-    const { data: lineRows } = await supabase
+    if (hErr) { setError(hErr.message); setRow(null); setLoading(false); return }
+    const { data: lineRows, error: lErr } = await supabase
       .from('rental_billing_lines')
       .select('description, quantity_kg, price_per_kg, subtotal')
       .eq('billing_id', billingId)
+    if (lErr) { setError(lErr.message); setRow(null); setLoading(false); return }
+    setError(null)
     setRow((data as unknown as Billing) || null)
     setLines((lineRows as BillingLine[]) || [])
     setLoading(false)
@@ -94,6 +98,8 @@ export default function BillingDetailPage() {
 
         {loading ? (
           <div className="text-center py-16 text-slate-400"><Loader2 className="w-6 h-6 animate-spin mx-auto" /></div>
+        ) : error ? (
+          <div className="p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700">{error}</div>
         ) : !row ? (
           <div className="text-center py-16 text-slate-400"><FileText className="w-8 h-8 mx-auto mb-2 opacity-40" />Invoice tidak ditemukan.</div>
         ) : (
