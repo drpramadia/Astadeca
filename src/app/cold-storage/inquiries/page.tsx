@@ -11,7 +11,6 @@ import { Plus, Search, FileText, Loader2 } from 'lucide-react'
 type Inquiry = {
   id: string
   status: string
-  requested_kg: number
   start_date: string | null
   end_date: string | null
   notes: string | null
@@ -104,7 +103,6 @@ export default function InquiryPage() {
               <tr className="bg-slate-50 border-b border-slate-200">
                 <th className="text-left px-4 py-3 font-semibold text-slate-600">Customer</th>
                 <th className="text-left px-4 py-3 font-semibold text-slate-600">Cold Storage</th>
-                <th className="text-right px-4 py-3 font-semibold text-slate-600">Kg Diminta</th>
                 <th className="text-left px-4 py-3 font-semibold text-slate-600">Periode</th>
                 <th className="text-center px-4 py-3 font-semibold text-slate-600">Status</th>
                 <th className="text-right px-4 py-3 font-semibold text-slate-600">Tanggal</th>
@@ -113,13 +111,13 @@ export default function InquiryPage() {
             <tbody>
               {loading ? (
                 <tr>
-                  <td colSpan={6} className="text-center py-12 text-slate-400">
+                  <td colSpan={5} className="text-center py-12 text-slate-400">
                     <Loader2 className="w-6 h-6 animate-spin mx-auto" />
                   </td>
                 </tr>
               ) : filtered.length === 0 ? (
                 <tr>
-                  <td colSpan={6} className="text-center py-12 text-slate-400">
+                  <td colSpan={5} className="text-center py-12 text-slate-400">
                     <FileText className="w-8 h-8 mx-auto mb-2 opacity-30" />
                     <p>Belum ada inquiry</p>
                   </td>
@@ -129,7 +127,6 @@ export default function InquiryPage() {
                   <tr key={row.id} className="border-b border-slate-100 hover:bg-slate-50 transition-colors">
                     <td className="px-4 py-3 font-medium text-slate-800">{row.rental_customers?.name ?? '-'}</td>
                     <td className="px-4 py-3 text-slate-600">{row.cold_storages?.name ?? '-'}</td>
-                    <td className="px-4 py-3 text-right font-mono text-slate-700">{row.requested_kg.toLocaleString('id-ID')} kg</td>
                     <td className="px-4 py-3 text-slate-600 text-xs">
                       {row.start_date ? `${new Date(row.start_date).toLocaleDateString('id-ID')} - ${row.end_date ? new Date(row.end_date).toLocaleDateString('id-ID') : '-'}` : '-'}
                     </td>

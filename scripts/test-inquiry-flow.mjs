@@ -64,7 +64,7 @@ try {
 
   const inq = await ins('rental_inquiries', {
     organization_id: ORG, customer_id: created.customer, cold_storage_id: store.id,
-    requested_kg: 1500, start_date: new Date().toISOString().slice(0, 10),
+    start_date: new Date().toISOString().slice(0, 10),
     end_date: new Date(Date.now() + 30 * 864e5).toISOString().slice(0, 10),
     notes: 'Uji alur inquiry ke kontrak', status: 'PENDING', created_by: s.userId,
   }, T)

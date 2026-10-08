@@ -26,7 +26,7 @@ export default function NewInquiryPage() {
 
   const { register, handleSubmit, watch, formState: { errors } } = useForm({
     defaultValues: {
-      customer_id: '', cold_storage_id: '', requested_kg: '', notes: '',
+      customer_id: '', cold_storage_id: '', notes: '',
       start_date: new Date().toISOString().slice(0, 10),
       duration_days: '90',
     },
@@ -67,7 +67,6 @@ export default function NewInquiryPage() {
         organization_id: organizationId,
         customer_id: form.customer_id || null,
         cold_storage_id: form.cold_storage_id || null,
-        requested_kg: parseFloat(form.requested_kg) || 0,
         start_date: form.start_date || null,
         end_date: computeEndDate(form.start_date, parseInt(form.duration_days) || 0) || null,
         notes: form.notes || null,
@@ -136,12 +135,7 @@ export default function NewInquiryPage() {
             </div>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-            <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1">Kg Diminta *</label>
-              <input type="number" step="0.01" {...register('requested_kg', { required: 'Wajib diisi' })} className="w-full border border-slate-200 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary" />
-              {errors.requested_kg && <p className="text-xs text-red-500 mt-1">{errors.requested_kg.message as string}</p>}
-            </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
               <label className="block text-sm font-medium text-slate-700 mb-1">Tanggal Mulai</label>
               <input type="date" {...register('start_date')} className="w-full border border-slate-200 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary" />

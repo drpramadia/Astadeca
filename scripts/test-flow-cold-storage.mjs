@@ -68,7 +68,7 @@ try {
 
   const inq = await ins('rental_inquiries', {
     organization_id: ORG, customer_id: created.customer, cold_storage_id: store.id,
-    requested_kg: 1000, start_date: new Date().toISOString().slice(0, 10),
+    start_date: new Date().toISOString().slice(0, 10),
     end_date: new Date(Date.now() + 90 * 864e5).toISOString().slice(0, 10),
     notes: 'Estimasi informasi kunjungan saja', status: 'CONVERTED', created_by: s.userId,
   }, T)

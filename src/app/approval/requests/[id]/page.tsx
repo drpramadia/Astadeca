@@ -75,13 +75,12 @@ export default function ApprovalDetailPage() {
     try {
       if (a.request_type === 'RENTAL_INQUIRY') {
         const { data } = await supabase.from('rental_inquiries')
-          .select('requested_kg, start_date, end_date, notes, rental_customers(name), cold_storages(name)')
+          .select('start_date, end_date, notes, rental_customers(name), cold_storages(name)')
           .eq('id', a.reference_id).single()
-        const q = data as unknown as { requested_kg: number; start_date: string | null; end_date: string | null; notes: string | null; rental_customers: { name: string } | null; cold_storages: { name: string } | null } | null
+        const q = data as unknown as { start_date: string | null; end_date: string | null; notes: string | null; rental_customers: { name: string } | null; cold_storages: { name: string } | null } | null
         if (q) detail.push(
           { label: 'Penyewa', value: q.rental_customers?.name ?? '-' },
           { label: 'Cold Storage', value: q.cold_storages?.name ?? '-' },
-          { label: 'Jumlah Diminta', value: `${Number(q.requested_kg).toLocaleString('id-ID')} kg` },
           { label: 'Periode', value: `${q.start_date ?? '-'} s/d ${q.end_date ?? '-'}` },
           { label: 'Catatan', value: q.notes ?? '-' },
         )
