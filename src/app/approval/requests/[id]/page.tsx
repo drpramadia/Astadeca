@@ -208,7 +208,7 @@ export default function ApprovalDetailPage() {
       else if (t === 'SALES_ORDER') await supabase.from('sales_orders').update({ status: 'APPROVED' }).eq('id', refId)
       else if (t === 'CONTRACT') await supabase.from('rental_contracts').update({ status: 'ACTIVE' }).eq('id', refId)
       else if (t === 'DELIVERY') await supabase.from('delivery_requests').update({ status: 'APPROVED' }).eq('id', refId)
-      else if (t === 'RENTAL_INQUIRY') await supabase.from('rental_inquiries').update({ status: 'APPROVED' }).eq('id', refId)
+      else if (t === 'RENTAL_INQUIRY') await supabase.from('rental_inquiries').update({ status: 'CONVERTED' }).eq('id', refId)
     } else {
       if (t === 'PURCHASE_ORDER') await supabase.from('purchase_orders').update({ status: 'REJECTED' }).eq('id', refId)
       else if (t === 'SALES_ORDER') await supabase.from('sales_orders').update({ status: 'REJECTED' }).eq('id', refId)

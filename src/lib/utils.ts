@@ -51,7 +51,7 @@ export function formatCurrency(
  */
 export function getBadgeTone(status: string): string {
   const s = (status ?? '').toLowerCase().replace(/_/g, ' ')
-  if (['active', 'available', 'approved', 'good', 'released', 'printed'].includes(s))
+  if (['active', 'available', 'approved', 'converted', 'good', 'released', 'printed'].includes(s))
     return 'bg-success/10 text-success'
   if (['pending', 'pending approval', 'draft', 'quarantine', 'reserved'].includes(s))
     return 'bg-warning/10 text-warning'
