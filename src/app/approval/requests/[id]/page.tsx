@@ -191,6 +191,27 @@ export default function ApprovalDetailPage() {
 
     if (!uid) { setProcessing(false); setError('Sesi tidak ditemukan.'); return }
 
+    // Update dokumen terkait TERLEBIH DAHULU. Bila gagal, jangan tandai
+    // approval sebagai selesai (agar status dokumen & approval tidak pincang).
+    const refId = row.reference_id
+    const t = row.request_type
+    let docErr: { message: string } | null = null
+    if (decision === 'APPROVED') {
+      if (t === 'PURCHASE_ORDER') ({ error: docErr } = await supabase.from('purchase_orders').update({ status: 'APPROVED' }).eq('id', refId))
+      else if (t === 'SALES_ORDER') ({ error: docErr } = await supabase.from('sales_orders').update({ status: 'APPROVED' }).eq('id', refId))
+      else if (t === 'CONTRACT') ({ error: docErr } = await supabase.from('rental_contracts').update({ status: 'ACTIVE' }).eq('id', refId))
+      else if (t === 'DELIVERY') ({ error: docErr } = await supabase.from('delivery_requests').update({ status: 'APPROVED' }).eq('id', refId))
+      else if (t === 'RENTAL_INQUIRY') ({ error: docErr } = await supabase.from('rental_inquiries').update({ status: 'CONVERTED' }).eq('id', refId))
+    } else {
+      if (t === 'PURCHASE_ORDER') ({ error: docErr } = await supabase.from('purchase_orders').update({ status: 'REJECTED' }).eq('id', refId))
+      else if (t === 'SALES_ORDER') ({ error: docErr } = await supabase.from('sales_orders').update({ status: 'REJECTED' }).eq('id', refId))
+      else if (t === 'CONTRACT') ({ error: docErr } = await supabase.from('rental_contracts').update({ status: 'CANCELLED' }).eq('id', refId))
+      else if (t === 'DELIVERY') ({ error: docErr } = await supabase.from('delivery_requests').update({ status: 'REJECTED' }).eq('id', refId))
+      else if (t === 'RENTAL_INQUIRY') ({ error: docErr } = await supabase.from('rental_inquiries').update({ status: 'REJECTED' }).eq('id', refId))
+    }
+
+    if (docErr) { setProcessing(false); setError(`Gagal memperbarui dokumen: ${docErr.message}`); return }
+
     const { error: updErr } = await supabase.from('approval_requests').update({
       status: decision,
       decided_by: uid,
@@ -199,23 +220,6 @@ export default function ApprovalDetailPage() {
     }).eq('id', row.id)
 
     if (updErr) { setProcessing(false); setError(updErr.message); return }
-
-    // Update dokumen terkait
-    const refId = row.reference_id
-    const t = row.request_type
-    if (decision === 'APPROVED') {
-      if (t === 'PURCHASE_ORDER') await supabase.from('purchase_orders').update({ status: 'APPROVED' }).eq('id', refId)
-      else if (t === 'SALES_ORDER') await supabase.from('sales_orders').update({ status: 'APPROVED' }).eq('id', refId)
-      else if (t === 'CONTRACT') await supabase.from('rental_contracts').update({ status: 'ACTIVE' }).eq('id', refId)
-      else if (t === 'DELIVERY') await supabase.from('delivery_requests').update({ status: 'APPROVED' }).eq('id', refId)
-      else if (t === 'RENTAL_INQUIRY') await supabase.from('rental_inquiries').update({ status: 'CONVERTED' }).eq('id', refId)
-    } else {
-      if (t === 'PURCHASE_ORDER') await supabase.from('purchase_orders').update({ status: 'REJECTED' }).eq('id', refId)
-      else if (t === 'SALES_ORDER') await supabase.from('sales_orders').update({ status: 'REJECTED' }).eq('id', refId)
-      else if (t === 'CONTRACT') await supabase.from('rental_contracts').update({ status: 'CANCELLED' }).eq('id', refId)
-      else if (t === 'DELIVERY') await supabase.from('delivery_requests').update({ status: 'REJECTED' }).eq('id', refId)
-      else if (t === 'RENTAL_INQUIRY') await supabase.from('rental_inquiries').update({ status: 'REJECTED' }).eq('id', refId)
-    }
 
     setProcessing(false)
     router.push('/approval/requests')

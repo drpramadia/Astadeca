@@ -60,21 +60,24 @@ export default function ApprovalPage() {
     setProcessing(id)
     const { data: userData } = await supabase.auth.getUser()
     const row = data.find((r) => r.id === id)
+    if (row) {
+      // Update dokumen terkait dulu; jangan tandai approval bila dokumen gagal.
+      const refId = row.reference_id
+      const t = row.request_type
+      let docErr: { message: string } | null = null
+      if (t === 'PURCHASE_ORDER') ({ error: docErr } = await supabase.from('purchase_orders').update({ status: 'APPROVED' }).eq('id', refId))
+      else if (t === 'SALES_ORDER') ({ error: docErr } = await supabase.from('sales_orders').update({ status: 'APPROVED' }).eq('id', refId))
+      else if (t === 'CONTRACT') ({ error: docErr } = await supabase.from('rental_contracts').update({ status: 'ACTIVE' }).eq('id', refId))
+      else if (t === 'DELIVERY') ({ error: docErr } = await supabase.from('delivery_requests').update({ status: 'APPROVED' }).eq('id', refId))
+      else if (t === 'RENTAL_INQUIRY') ({ error: docErr } = await supabase.from('rental_inquiries').update({ status: 'CONVERTED' }).eq('id', refId))
+      else if (t === 'QUOTATION') ({ error: docErr } = await supabase.from('quotations').update({ status: 'APPROVED' }).eq('id', refId))
+      if (docErr) { alert(`Gagal memperbarui dokumen: ${docErr.message}`); setProcessing(null); return }
+    }
     await supabase.from('approval_requests').update({
       status: 'APPROVED',
       decided_by: userData.user?.id,
       decided_at: new Date().toISOString(),
     }).eq('id', id)
-    if (row) {
-      const refId = row.reference_id
-      const t = row.request_type
-      if (t === 'PURCHASE_ORDER') await supabase.from('purchase_orders').update({ status: 'APPROVED' }).eq('id', refId)
-      else if (t === 'SALES_ORDER') await supabase.from('sales_orders').update({ status: 'APPROVED' }).eq('id', refId)
-      else if (t === 'CONTRACT') await supabase.from('rental_contracts').update({ status: 'ACTIVE' }).eq('id', refId)
-      else if (t === 'DELIVERY') await supabase.from('delivery_requests').update({ status: 'APPROVED' }).eq('id', refId)
-      else if (t === 'RENTAL_INQUIRY') await supabase.from('rental_inquiries').update({ status: 'CONVERTED' }).eq('id', refId)
-      else if (t === 'QUOTATION') await supabase.from('quotations').update({ status: 'APPROVED' }).eq('id', refId)
-    }
     setProcessing(null)
     fetchData()
   }
