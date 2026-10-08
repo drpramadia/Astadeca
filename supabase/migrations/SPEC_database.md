@@ -98,6 +98,15 @@
 - Alur: barang masuk/keluar dicatat per hari -> snapshot harian -> saat
   penagihan, snapshot dijumlahkan menjadi total invoice.
 
+## Penerbitan Invoice Manual (per migrasi 025)
+- Invoice TIDAK terbit otomatis saat barang masuk/keluar. Trigger
+  `trg_receiving_billing` & `trg_release_billing` dihapus.
+- Admin/Director menerbitkan invoice lewat tombol "Terbitkan Invoice"
+  di halaman Billing (memanggil `calculate_rental_billing` sesuai periode
+  tagih berjalan, default 7 hari/mingguan).
+- Snapshot harian (`refresh_daily_usage_*`) tetap berjalan otomatis agar
+  kg per hari tetap tercatat.
+
 ## Permissions
 ADMIN: rental.*, inventory.*, purchase.*, sales.*, finance.*, admin.*, documents.*, reports.*
 WAREHOUSE: inventory.view, inventory.receive, inventory.issue, qc.*
