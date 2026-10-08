@@ -10,7 +10,11 @@ function check(n, ok, d = '') { results.push({ n, ok: !!ok }); console.log(`${ok
 
 try {
   await client.query('begin')
-  const cust = (await client.query('select id from rental_customers where organization_id=$1 limit 1', [ORG])).rows[0]
+  // Self-contained: buat penyewa sendiri (DB bisa saja kosong dari data contoh).
+  const cust = (await client.query(
+    `insert into rental_customers (organization_id, name, phone) values ($1, 'Penyewa Spot (UJI)', '0800-0002') returning id`,
+    [ORG]
+  )).rows[0]
   const cs = (await client.query('select id from cold_storages where organization_id=$1 limit 1', [ORG])).rows[0]
   const admin = (await client.query("select user_id from organization_memberships om join profiles p on p.id=om.user_id where p.username='gian' limit 1")).rows[0]?.user_id
 

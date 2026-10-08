@@ -111,7 +111,11 @@ try {
   check('SO -> inventory_movement OUT tercatat', mvOut.rows[0].n === 1)
 
   // ---------- FLOW SEWA: kontrak -> receiving -> billing (mingguan, hari berisi) ----------
-  const rc = await client.query('select id from rental_customers where organization_id=$1 limit 1', [ORG])
+  // Self-contained: buat penyewa sewa sendiri (DB bisa saja kosong dari data contoh).
+  const rc = await client.query(
+    `insert into rental_customers (organization_id, name, phone) values ($1, 'Penyewa E2E (UJI)', '0800-0000') returning id`,
+    [ORG]
+  )
   const contractNum = (await client.query("select generate_number('KONTRAK') as n")).rows[0].n
   const contract = await client.query(
     `insert into rental_contracts (organization_id, customer_id, cold_storage_id, contract_number, start_date, end_date, price_per_kg_per_day, status)
@@ -125,12 +129,15 @@ try {
      values ($1,$2,1000, now(), $3, 'RCV-E2E')`,
     [ORG, contractId, ids.warehouse]
   )
+  // Invoice diterbitkan MANUAL (trigger auto-billing dihapus di migrasi 025)
+  await client.query('select calculate_rental_billing($1)', [contractId])
   const rb = await client.query('select invoice_number, total_amount, period_start, period_end, status from rental_billing where contract_id=$1', [contractId])
-  const periodDays = Math.round((new Date(rb.rows[0].period_end) - new Date(rb.rows[0].period_start)) / 86400000) + 1
-  check('Receiving -> rental_billing terbit', rb.rows.length === 1, rb.rows[0]?.invoice_number)
+  const periodDays = rb.rows.length ? Math.round((new Date(rb.rows[0].period_end) - new Date(rb.rows[0].period_start)) / 86400000) + 1 : 0
+  check('Receiving + terbit manual -> rental_billing terbit', rb.rows.length === 1, rb.rows[0]?.invoice_number)
   check('Billing periode = 7 hari (mingguan, rolling)', periodDays === 7, `days=${periodDays}`)
-  check('Billing total = 1000kg x 100 x 7hari = 700.000', Number(rb.rows[0].total_amount) === 700000, `total=${rb.rows[0].total_amount}`)
-  check('Billing status awal SENT', rb.rows[0].status === 'SENT', rb.rows[0].status)
+  // 1000 kg sehari (hari ini saja) x 100 = 100.000, minimum 1 ton terpakai
+  check('Billing total = 1000kg x 100 = 100.000 (hari berisi)', Number(rb.rows[0]?.total_amount) === 100000, `total=${rb.rows[0]?.total_amount}`)
+  check('Billing status awal SENT', rb.rows[0]?.status === 'SENT', rb.rows[0]?.status)
 
   // ---------- FINANCE: payment menutup invoice ----------
   const billingId = (await client.query('select id from rental_billing where contract_id=$1', [contractId])).rows[0].id
@@ -153,10 +160,11 @@ try {
      values ($1,$2,500, now(), $3)`,
     [ORG, contract2.rows[0].id, ids.warehouse]
   )
+  await client.query('select calculate_rental_billing($1)', [contract2.rows[0].id])
   const rb2 = await client.query('select id, total_amount from rental_billing where contract_id=$1', [contract2.rows[0].id])
   await client.query(
     `insert into payments (organization_id, reference_type, reference_id, amount, payment_method, created_by)
-     values ($1,'RENTAL_BILLING',$2, 100000, 'CASH', $3)`,
+     values ($1,'RENTAL_BILLING',$2, 50000, 'CASH', $3)`,
     [ORG, rb2.rows[0].id, ids.admin]
   )
   const rb2After = await client.query('select status from rental_billing where id=$1', [rb2.rows[0].id])

@@ -14,7 +14,11 @@ function check(n, ok, d = '') { results.push({ n, ok: !!ok }); console.log(`${ok
 
 try {
   await client.query('begin')
-  const cust = (await client.query('select id from rental_customers where organization_id=$1 limit 1', [ORG])).rows[0]
+  // Self-contained: buat penyewa sendiri (DB bisa saja kosong dari data contoh).
+  const cust = (await client.query(
+    `insert into rental_customers (organization_id, name, phone) values ($1, 'Penyewa Gate (UJI)', '0800-0001') returning id`,
+    [ORG]
+  )).rows[0]
   const cs = (await client.query('select id from cold_storages where organization_id=$1 limit 1', [ORG])).rows[0]
   const wh = (await client.query("select user_id from organization_memberships om join profiles p on p.id=om.user_id where p.username='siswoko' limit 1")).rows[0]?.user_id
 
@@ -28,9 +32,10 @@ try {
 
   await client.query(`insert into rental_receivings (organization_id, contract_id, received_kg, received_at, received_by) values ($1,$2,600, now(), $3)`, [ORG, c.id, wh])
 
-  // billing otomatis mengikuti perjanjian + minimum 1 ton
+  // Invoice diterbitkan MANUAL (trigger auto-billing dihapus di migrasi 025)
+  await client.query('select calculate_rental_billing($1)', [c.id])
   const bill = (await client.query('select id, status, total_amount from rental_billing where contract_id=$1', [c.id])).rows[0]
-  check('billing terbit otomatis mengikuti perjanjian kontrak', !!bill, bill ? `status=${bill.status}` : '')
+  check('billing terbit mengikuti perjanjian kontrak (manual)', !!bill, bill ? `status=${bill.status}` : '')
   // 600 kg aktual, minimum 1 ton -> 1 hari berisi stok x 1000 kg x Rp100 = Rp100.000 untuk hari berjalan
   check('minimum 1 ton diterapkan (kg ditagih = 1.000)', Number(bill?.total_amount) >= 100000, `total=${bill?.total_amount}`)
 
