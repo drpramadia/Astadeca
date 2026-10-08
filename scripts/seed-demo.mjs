@@ -107,8 +107,8 @@ try {
   if (hasContract === 0 && css[0] && rc) {
     const num = (await q("select generate_number('KONTRAK') as n"))[0].n
     const c = (await q(
-      `insert into rental_contracts (organization_id, customer_id, cold_storage_id, contract_number, start_date, end_date, price_per_kg_per_day, total_estimated_kg, status, created_by)
-       values ($1,$2,$3,$4, current_date, current_date + 89, 100, 2000, 'ACTIVE', $5) returning id`,
+      `insert into rental_contracts (organization_id, customer_id, cold_storage_id, contract_number, start_date, end_date, price_per_kg_per_day, status, created_by)
+       values ($1,$2,$3,$4, current_date, current_date + 89, 100, 'ACTIVE', $5) returning id`,
       [ORG, rc.id, css[0].id, num, users.admin]
     ))[0]
     await q(

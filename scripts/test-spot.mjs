@@ -16,7 +16,7 @@ try {
 
   const num = (await client.query("select generate_number('SPOT') as n")).rows[0].n
   const c = (await client.query(
-    `insert into rental_contracts (organization_id, customer_id, cold_storage_id, contract_number, start_date, price_per_kg_per_day, total_estimated_kg, status, is_spot, days_paid, days_used, created_by)
+    `insert into rental_contracts (organization_id, customer_id, cold_storage_id, contract_number, start_date, price_per_kg_per_day, spot_kg, status, is_spot, days_paid, days_used, created_by)
      values ($1,$2,$3,$4, current_date, 100, 1000, 'ACTIVE', true, 0, 0, $5) returning id`,
     [ORG, cust.id, cs.id, num, admin]
   )).rows[0]

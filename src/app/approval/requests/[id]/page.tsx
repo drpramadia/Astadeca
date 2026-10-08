@@ -47,7 +47,7 @@ export default function ApprovalDetailPage() {
   const [rejectReason, setRejectReason] = useState('')
   const [error, setError] = useState<string | null>(null)
 
-  const canApprove = roleCode === 'DIRECTOR'
+  const canApprove = roleCode === 'DIRECTOR' || roleCode === 'SYSTEM_ADMIN'
 
   useEffect(() => {
     if (!loaded || !id) return
@@ -86,16 +86,15 @@ export default function ApprovalDetailPage() {
         )
       } else if (a.request_type === 'CONTRACT') {
         const { data } = await supabase.from('rental_contracts')
-          .select('contract_number, start_date, end_date, price_per_kg_per_day, total_estimated_kg, rental_customers(name), cold_storages(name)')
+          .select('contract_number, start_date, end_date, price_per_kg_per_day, rental_customers(name), cold_storages(name)')
           .eq('id', a.reference_id).single()
-        const k = data as unknown as { contract_number: string; start_date: string; end_date: string | null; price_per_kg_per_day: number; total_estimated_kg: number; rental_customers: { name: string } | null; cold_storages: { name: string } | null } | null
+        const k = data as unknown as { contract_number: string; start_date: string; end_date: string | null; price_per_kg_per_day: number; rental_customers: { name: string } | null; cold_storages: { name: string } | null } | null
         if (k) detail.push(
           { label: 'No. Kontrak', value: k.contract_number },
           { label: 'Penyewa', value: k.rental_customers?.name ?? '-' },
           { label: 'Cold Storage', value: k.cold_storages?.name ?? '-' },
           { label: 'Periode', value: `${formatDate(k.start_date)} s/d ${k.end_date ? formatDate(k.end_date) : '-'}` },
           { label: 'Tarif', value: `${formatCurrency(k.price_per_kg_per_day)}/kg/hari` },
-          { label: 'Estimasi Berat', value: `${Number(k.total_estimated_kg).toLocaleString('id-ID')} kg` },
         )
       } else if (a.request_type === 'PURCHASE_ORDER') {
         const { data } = await supabase.from('purchase_orders')

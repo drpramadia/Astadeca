@@ -34,7 +34,7 @@ export default function ApprovalPage() {
   const [loading, setLoading] = useState(true)
   const [processing, setProcessing] = useState<string | null>(null)
 
-  const canApprove = roleCode === 'DIRECTOR'
+  const canApprove = roleCode === 'DIRECTOR' || roleCode === 'SYSTEM_ADMIN'
 
   useEffect(() => {
     if (!loaded) return

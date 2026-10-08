@@ -27,7 +27,7 @@ export default function InquiryPage() {
   const [search, setSearch] = useState('')
   
 
-  const canAccess = roleCode === 'DIRECTOR' || roleCode === 'ADMIN'
+  const canAccess = roleCode === 'DIRECTOR' || roleCode === 'ADMIN' || roleCode === 'SYSTEM_ADMIN'
 
   useEffect(() => {
     if (!loaded) return

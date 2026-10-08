@@ -17,6 +17,7 @@ type Customer = {
   address: string | null
   customer_type: string | null
   created_at: string
+  customer_items?: { product_id: string }[]
 }
 
 const CSV_COLUMNS = [
@@ -38,17 +39,31 @@ export default function CustomersPage() {
   const [error, setError] = useState<string | null>(null)
   const [form, setForm] = useState({ name: '', email: '', phone: '', address: '', customer_type: 'BOTH' })
   const [editId, setEditId] = useState<string | null>(null)
+  const [products, setProducts] = useState<{ id: string; name: string; sku: string }[]>([])
+  const [itemIds, setItemIds] = useState<string[]>([])
 
   useEffect(() => {
     if (!loaded) return
     fetchData()
+    loadProducts()
   }, [loaded])
+
+  async function loadProducts() {
+    const { data: rows } = await supabase
+      .from('products')
+      .select('id, name, sku')
+      .eq('organization_id', organizationId)
+      .eq('is_active', true)
+      .order('name')
+      .limit(1000)
+    setProducts((rows as { id: string; name: string; sku: string }[]) || [])
+  }
 
   async function fetchData() {
     setLoading(true)
     const { data: rows } = await supabase
       .from('customers')
-      .select('*')
+      .select('*, customer_items(product_id)')
       .eq('organization_id', organizationId)
       .order('created_at', { ascending: false })
       .limit(500)
@@ -74,7 +89,24 @@ export default function CustomersPage() {
       address: row.address ?? '',
       customer_type: row.customer_type ?? 'BOTH',
     })
+    setItemIds((row.customer_items ?? []).map((i) => i.product_id))
     setShowForm(true)
+  }
+
+  function toggleItem(productId: string) {
+    setItemIds((prev) => prev.includes(productId) ? prev.filter((x) => x !== productId) : [...prev, productId])
+  }
+
+  async function saveItems(customerId: string) {
+    const { error: delErr } = await supabase.from('customer_items').delete().eq('customer_id', customerId)
+    if (delErr) { setError(delErr.message); return false }
+    if (itemIds.length > 0) {
+      const { error: insErr } = await supabase.from('customer_items').insert(
+        itemIds.map((pid) => ({ organization_id: organizationId, customer_id: customerId, product_id: pid }))
+      )
+      if (insErr) { setError(insErr.message); return false }
+    }
+    return true
   }
 
   async function handleDelete(id: string) {
@@ -102,17 +134,22 @@ export default function CustomersPage() {
     if (editId) {
       const { error: err } = await supabase.from('customers').update(payload).eq('id', editId)
       if (err) { setError(err.message); setSaving(false); return }
+      const ok = await saveItems(editId)
+      if (!ok) { setSaving(false); return }
     } else {
-      const { error: err } = await supabase.from('customers').insert({
+      const { data: inserted, error: err } = await supabase.from('customers').insert({
         ...payload,
         organization_id: organizationId,
-      })
-      if (err) { setError(err.message); setSaving(false); return }
+      }).select().single()
+      if (err || !inserted) { setError(err?.message ?? 'Gagal menyimpan'); setSaving(false); return }
+      const ok = await saveItems(inserted.id)
+      if (!ok) { setSaving(false); return }
     }
     setSaving(false)
     setShowForm(false)
     setEditId(null)
     setForm({ name: '', email: '', phone: '', address: '', customer_type: 'BOTH' })
+    setItemIds([])
     fetchData()
   }
 
@@ -197,6 +234,7 @@ export default function CustomersPage() {
                 setShowForm(true)
                 setEditId(null)
                 setForm({ name: '', email: '', phone: '', address: '', customer_type: 'BOTH' })
+                setItemIds([])
               }}
               className="flex items-center gap-2 px-4 py-2 bg-primary hover:bg-primary/90 text-white text-sm font-medium rounded-lg transition-colors"
             >
@@ -258,6 +296,26 @@ export default function CustomersPage() {
                 className="w-full border border-slate-200 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary resize-none"
               />
             </div>
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-1">
+                Barang yang Dibutuhkan {itemIds.length > 0 && <span className="text-primary">({itemIds.length} dipilih)</span>}
+              </label>
+              <div className="border border-slate-200 rounded-lg p-3 max-h-48 overflow-y-auto grid grid-cols-2 sm:grid-cols-3 gap-2">
+                {products.length === 0 ? (
+                  <p className="text-xs text-slate-400 col-span-full">Belum ada produk. Tambahkan di Master Produk.</p>
+                ) : products.map((p) => (
+                  <label key={p.id} className="flex items-center gap-2 text-sm text-slate-700 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={itemIds.includes(p.id)}
+                      onChange={() => toggleItem(p.id)}
+                      className="rounded border-slate-300"
+                    />
+                    <span className="truncate" title={`${p.name} (${p.sku})`}>{p.name}</span>
+                  </label>
+                ))}
+              </div>
+            </div>
             <div className="flex gap-3 justify-end">
               <button
                 type="button"
@@ -296,6 +354,7 @@ export default function CustomersPage() {
                 <th className="text-left px-4 py-3 font-semibold text-slate-600">Nama</th>
                 <th className="text-left px-4 py-3 font-semibold text-slate-600">Email</th>
                 <th className="text-left px-4 py-3 font-semibold text-slate-600">Telepon</th>
+                <th className="text-left px-4 py-3 font-semibold text-slate-600">Kebutuhan</th>
                 <th className="text-left px-4 py-3 font-semibold text-slate-600">Alamat</th>
                 <th className="text-center px-4 py-3 font-semibold text-slate-600">Tipe</th>
                 <th className="text-right px-4 py-3 font-semibold text-slate-600">Aksi</th>
@@ -304,13 +363,13 @@ export default function CustomersPage() {
             <tbody>
               {loading ? (
                 <tr>
-                  <td colSpan={6} className="text-center py-12 text-slate-400">
+                  <td colSpan={7} className="text-center py-12 text-slate-400">
                     <Loader2 className="w-6 h-6 animate-spin mx-auto" />
                   </td>
                 </tr>
               ) : filtered.length === 0 ? (
                 <tr>
-                  <td colSpan={6} className="text-center py-12 text-slate-400">
+                  <td colSpan={7} className="text-center py-12 text-slate-400">
                     <Building2 className="w-8 h-8 mx-auto mb-2 opacity-30" />
                     <p>Belum ada customer</p>
                   </td>
@@ -321,6 +380,9 @@ export default function CustomersPage() {
                     <td className="px-4 py-3 font-medium text-slate-800">{row.name}</td>
                     <td className="px-4 py-3 text-slate-600">{row.email ?? '-'}</td>
                     <td className="px-4 py-3 text-slate-600">{row.phone ?? '-'}</td>
+                    <td className="px-4 py-3 text-slate-600 text-xs">
+                      {(row.customer_items?.length ?? 0) > 0 ? `${row.customer_items!.length} barang` : '-'}
+                    </td>
                     <td className="px-4 py-3 text-slate-600 text-xs">{row.address ?? '-'}</td>
                     <td className="px-4 py-3 text-center">
                       <span className="inline-flex px-2 py-0.5 rounded-full text-xs font-medium bg-slate-100 text-slate-600">

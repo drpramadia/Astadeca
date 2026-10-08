@@ -22,8 +22,9 @@ const FIELDS: { group: string; icon: React.ElementType; items: FieldDef[] }[] = 
     icon: Wallet,
     items: [
       { key: 'rental.tariff_per_kg_per_day', label: 'Tarif per Kg / Hari', description: 'Tarif dasar rental (Rp). Kontrak baru memakai nilai ini.', type: 'number' },
-      { key: 'rental.billing_period_days', label: 'Periode Tagih (hari)', description: 'Interval penagihan kontrak (mis. 14 = 2 minggu).', type: 'number' },
+      { key: 'rental.billing_period_days', label: 'Periode Tagih (hari)', description: 'Interval penagihan kontrak (7 = mingguan, 14 = 2 minggu).', type: 'number' },
       { key: 'rental.minimum_days', label: 'Minimum Hari', description: 'Minimal hari yang ditagih (nitip beberapa jam tetap dihitung).', type: 'number' },
+      { key: 'rental.expiry_alert_days', label: 'Peringatan Expiry (hari)', description: 'Berapa hari sebelum kedaluwarsa sistem mengirim notifikasi waste/expiry.', type: 'number' },
     ],
   },
   {

@@ -27,7 +27,7 @@ export default function NewPOPage() {
   const [loadingRefs, setLoadingRefs] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
-  const canAccess = roleCode === 'DIRECTOR' || roleCode === 'ADMIN'
+  const canAccess = roleCode === 'DIRECTOR' || roleCode === 'ADMIN' || roleCode === 'SYSTEM_ADMIN'
 
   useEffect(() => {
     if (!loaded) return
@@ -76,7 +76,7 @@ export default function NewPOPage() {
       supplier_id: supplierId,
       po_number: poNumber,
       notes: notes || null,
-      status: roleCode === 'DIRECTOR' ? 'APPROVED' : 'PENDING_APPROVAL',
+      status: (roleCode === 'DIRECTOR' || roleCode === 'SYSTEM_ADMIN') ? 'APPROVED' : 'PENDING_APPROVAL',
       created_by: userData.user?.id,
     }).select().single()
 
@@ -94,7 +94,7 @@ export default function NewPOPage() {
     if (lineErr) { setError(lineErr.message); setSaving(false); return }
 
     // Create approval request for non-director users
-    if (roleCode !== 'DIRECTOR') {
+    if (roleCode !== 'DIRECTOR' && roleCode !== 'SYSTEM_ADMIN') {
       const { data: apprData, error: apprErr } = await supabase.from('approval_requests').insert({
         organization_id: organizationId,
         request_type: 'PURCHASE_ORDER',

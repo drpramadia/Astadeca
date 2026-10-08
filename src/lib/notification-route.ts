@@ -37,6 +37,11 @@ export function notificationHref(
     case 'RENTAL_BILLING':
       return '/cold-storage/billing'
 
+    // Waste/expiry -> buka detail kontrak (ada bagian Waste)
+    case 'WASTE_EXPIRY':
+    case 'WASTE_DIFF':
+      return referenceId ? `/cold-storage/contracts/${referenceId}` : '/cold-storage/contracts'
+
     default:
       return '/notifications'
   }

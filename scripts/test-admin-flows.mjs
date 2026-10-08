@@ -79,7 +79,7 @@ try {
   const kIns = await ins('rental_contracts', [{
     organization_id: ORG, customer_id: cust.id, cold_storage_id: cs.id, contract_number: kNum,
     start_date: new Date().toISOString().slice(0, 10), end_date: new Date(Date.now() + 29 * 864e5).toISOString().slice(0, 10),
-    price_per_kg_per_day: 100, total_estimated_kg: 1000, status: 'PENDING_APPROVAL',
+    price_per_kg_per_day: 100, status: 'PENDING_APPROVAL',
   }])
   check('Kontrak Baru tersimpan (dengan nomor)', kIns.status === 201 && kIns.body?.[0]?.contract_number === kNum, `${kIns.status} ${kIns.body?.[0]?.contract_number || JSON.stringify(kIns.body)}`)
   if (kIns.body?.[0]?.id) cleanup.rental_contracts.push(kIns.body[0].id)
@@ -88,7 +88,7 @@ try {
   const sNum = (await rpc('generate_number', { p_prefix: 'SPOT' })).body
   const sIns = await ins('rental_contracts', [{
     organization_id: ORG, customer_id: cust.id, cold_storage_id: cs.id, contract_number: sNum,
-    start_date: new Date().toISOString().slice(0, 10), price_per_kg_per_day: 100, total_estimated_kg: 500,
+    start_date: new Date().toISOString().slice(0, 10), price_per_kg_per_day: 100, spot_kg: 500,
     status: 'ACTIVE', is_spot: true, days_paid: 0, days_used: 0,
   }])
   check('Titipan Harian (spot) tersimpan', sIns.status === 201 && !!sIns.body?.[0]?.id, `${sIns.status} ${sIns.body?.[0]?.contract_number || JSON.stringify(sIns.body)}`)

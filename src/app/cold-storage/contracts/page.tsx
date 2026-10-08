@@ -17,7 +17,6 @@ type Contract = {
   start_date: string
   end_date: string
   price_per_kg_per_day: number
-  total_estimated_kg: number
   notes: string | null
   created_at: string
   rental_customers: { name: string } | null
@@ -34,7 +33,7 @@ export default function ContractsPage() {
   const [loadingPrint, setLoadingPrint] = useState(false)
   
 
-  const canAccess = roleCode === 'DIRECTOR' || roleCode === 'ADMIN'
+  const canAccess = roleCode === 'DIRECTOR' || roleCode === 'ADMIN' || roleCode === 'SYSTEM_ADMIN'
 
   useEffect(() => {
     if (!loaded || !canAccess) return
@@ -73,13 +72,13 @@ export default function ContractsPage() {
       ],
       lines: [
         {
-          name: 'Estimasi Kapasitas Rental',
-          quantity: row.total_estimated_kg,
-          unit: 'kg',
+          name: 'Tarif Sewa Penyimpanan',
+          quantity: 1,
+          unit: 'layanan',
           price: row.price_per_kg_per_day,
         },
       ],
-      totals: [{ label: 'Total Estimasi Kg', value: `${Number(row.total_estimated_kg).toLocaleString('id-ID')} kg` }],
+      totals: [{ label: 'Tarif per Kg/Hari', value: `Rp ${Number(row.price_per_kg_per_day).toLocaleString('id-ID')}` }],
       notes: row.notes,
       signatures: ['Pihak Penyewa', 'Pihak Cold Storage'],
     })
@@ -141,7 +140,6 @@ export default function ContractsPage() {
                 <th className="text-left px-4 py-3 font-semibold text-slate-600">No. Kontrak</th>
                 <th className="text-left px-4 py-3 font-semibold text-slate-600">Customer</th>
                 <th className="text-left px-4 py-3 font-semibold text-slate-600">Cold Storage</th>
-                <th className="text-right px-4 py-3 font-semibold text-slate-600">Kg Est.</th>
                 <th className="text-right px-4 py-3 font-semibold text-slate-600">Tarif/kg/hari</th>
                 <th className="text-center px-4 py-3 font-semibold text-slate-600">Periode</th>
                 <th className="text-center px-4 py-3 font-semibold text-slate-600">Status</th>
@@ -150,9 +148,9 @@ export default function ContractsPage() {
             </thead>
             <tbody>
               {loading ? (
-                <tr><td colSpan={8} className="text-center py-12 text-slate-400"><Loader2 className="w-6 h-6 animate-spin mx-auto" /></td></tr>
+                <tr><td colSpan={7} className="text-center py-12 text-slate-400"><Loader2 className="w-6 h-6 animate-spin mx-auto" /></td></tr>
               ) : filtered.length === 0 ? (
-                <tr><td colSpan={8} className="text-center py-12 text-slate-400"><FileText className="w-8 h-8 mx-auto mb-2 opacity-30" /><p>Belum ada kontrak</p></td></tr>
+                <tr><td colSpan={7} className="text-center py-12 text-slate-400"><FileText className="w-8 h-8 mx-auto mb-2 opacity-30" /><p>Belum ada kontrak</p></td></tr>
               ) : (
                 filtered.map((row) => (
                   <tr key={row.id} className="border-b border-slate-100 hover:bg-slate-50 transition-colors">
@@ -161,7 +159,6 @@ export default function ContractsPage() {
                     </td>
                     <td className="px-4 py-3 font-medium text-slate-800">{row.rental_customers?.name ?? '-'}</td>
                     <td className="px-4 py-3 text-slate-600">{row.cold_storages?.name ?? '-'}</td>
-                    <td className="px-4 py-3 text-right font-mono text-slate-700">{row.total_estimated_kg.toLocaleString('id-ID')} kg</td>
                     <td className="px-4 py-3 text-right font-mono text-slate-700">Rp {row.price_per_kg_per_day.toLocaleString('id-ID')}</td>
                     <td className="px-4 py-3 text-center text-xs text-slate-500">
                       {new Date(row.start_date).toLocaleDateString('id-ID')} - {new Date(row.end_date).toLocaleDateString('id-ID')}

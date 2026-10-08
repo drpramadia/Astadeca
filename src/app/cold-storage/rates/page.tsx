@@ -30,7 +30,7 @@ export default function RatesPage() {
   const [coldStorages, setColdStorages] = useState<{ id: string; name: string }[]>([])
   
 
-  const canEdit = roleCode === 'DIRECTOR' || roleCode === 'ADMIN'
+  const canEdit = roleCode === 'DIRECTOR' || roleCode === 'ADMIN' || roleCode === 'SYSTEM_ADMIN'
 
   useEffect(() => {
     if (!loaded) return

@@ -20,7 +20,6 @@ type Contract = {
   start_date: string
   end_date: string
   price_per_kg_per_day: number
-  total_estimated_kg: number
   notes: string | null
   created_at: string
   rental_customers: { name: string } | null
@@ -32,6 +31,8 @@ type Receiving = {
   received_kg: number
   batch_number: string | null
   received_at: string
+  expiry_date: string | null
+  product_id: string | null
   notes: string | null
 }
 
@@ -53,6 +54,32 @@ type Billing = {
   rental_billing_lines: { description: string; quantity_kg: number; price_per_kg: number; subtotal: number }[]
 }
 
+type WasteRecord = {
+  id: string
+  batch_number: string | null
+  quantity_kg: number
+  reason: string
+  notes: string | null
+  recorded_at: string
+}
+
+type WasteCandidate = {
+  contract_id: string
+  contract_number: string
+  batch_number: string | null
+  received_kg: number
+  released_kg: number
+  diff_kg: number
+  expiry_date: string | null
+}
+
+const WASTE_REASONS: Record<string, string> = {
+  SHRINKAGE: 'Susut (selisih)',
+  EXPIRY: 'Kedaluwarsa',
+  DAMAGED: 'Rusak',
+  OTHER: 'Lainnya',
+}
+
 export default function ContractDetailPage() {
   const { loaded, organizationId, userId } = useSession()
   const { denied } = useRoleGuard(['ADMIN', 'DIRECTOR', 'WAREHOUSE'])
@@ -62,9 +89,17 @@ export default function ContractDetailPage() {
   const [contract, setContract] = useState<Contract | null>(null)
   const [receivings, setReceivings] = useState<Receiving[]>([])
   const [releases, setReleases] = useState<Release[]>([])
+  const [waste, setWaste] = useState<WasteRecord[]>([])
+  const [wasteCandidates, setWasteCandidates] = useState<WasteCandidate[]>([])
   const [billing, setBilling] = useState<Billing | null>(null)
   const [loading, setLoading] = useState(true)
   const [recalculating, setRecalculating] = useState(false)
+
+  const [wasteKg, setWasteKg] = useState('')
+  const [wasteBatch, setWasteBatch] = useState('')
+  const [wasteReason, setWasteReason] = useState('SHRINKAGE')
+  const [wasteNotes, setWasteNotes] = useState('')
+  const [wasteSaving, setWasteSaving] = useState(false)
 
   const [printData, setPrintData] = useState<DocumentPrintData | null>(null)
   const [loadingPrint, setLoadingPrint] = useState(false)
@@ -72,8 +107,13 @@ export default function ContractDetailPage() {
   const [recvKg, setRecvKg] = useState('')
   const [recvBatch, setRecvBatch] = useState('')
   const [recvDate, setRecvDate] = useState('')
+  const [recvExpiry, setRecvExpiry] = useState('')
+  const [recvProduct, setRecvProduct] = useState('')
   const [recvNotes, setRecvNotes] = useState('')
   const [recvSaving, setRecvSaving] = useState(false)
+  const [products, setProducts] = useState<{ id: string; name: string; sku: string }[]>([])
+
+  const [wasteProduct, setWasteProduct] = useState('')
 
   const [relKg, setRelKg] = useState('')
   const [relBatch, setRelBatch] = useState('')
@@ -108,17 +148,40 @@ export default function ContractDetailPage() {
         .single(),
     ])
 
+    const { data: wasteRows } = await supabase
+      .from('waste_records')
+      .select('*')
+      .eq('contract_id', contractId)
+      .order('recorded_at', { ascending: false })
+
+    const { data: candRows } = await supabase.rpc('waste_candidates', { p_organization_id: organizationId })
+    const cand = ((candRows as WasteCandidate[]) || []).filter((c) => c.contract_id === contractId)
+
     setContract((cRes.data as Contract) || null)
     setReceivings((rRes.data as Receiving[]) || [])
     setReleases((relRes.data as Release[]) || [])
+    setWaste((wasteRows as WasteRecord[]) || [])
+    setWasteCandidates(cand)
     setBilling((bRes.data as Billing) || null)
     setLoading(false)
-  }, [contractId])
+  }, [contractId, organizationId])
 
   useEffect(() => {
     if (!loaded) return
     fetchData()
   }, [loaded, fetchData])
+
+  useEffect(() => {
+    if (!loaded || !organizationId) return
+    supabase
+      .from('products')
+      .select('id, name, sku')
+      .eq('organization_id', organizationId)
+      .eq('is_active', true)
+      .order('name')
+      .limit(1000)
+      .then(({ data }) => setProducts((data as { id: string; name: string; sku: string }[]) || []))
+  }, [loaded, organizationId])
 
   async function addReceiving() {
     if (!contractId || !userId) return
@@ -134,6 +197,8 @@ export default function ContractDetailPage() {
       received_kg: kg,
       batch_number: recvBatch || null,
       received_at: recvDate ? `${recvDate}T00:00:00` : new Date().toISOString(),
+      expiry_date: recvExpiry || null,
+      product_id: recvProduct || null,
       received_by: userId,
       notes: recvNotes || null,
     })
@@ -147,6 +212,8 @@ export default function ContractDetailPage() {
     setRecvKg('')
     setRecvBatch('')
     setRecvDate('')
+    setRecvExpiry('')
+    setRecvProduct('')
     setRecvNotes('')
     setRecvSaving(false)
     await fetchData()
@@ -201,11 +268,33 @@ export default function ContractDetailPage() {
       reference_id: contractId,
       status: 'PENDING',
       requested_by: userId,
-      notes: `Permintaan pengeluaran barang untuk kontrak ${contract?.contract_number ?? contractId}`,
+      comment: `Permintaan pengeluaran barang untuk kontrak ${contract?.contract_number ?? contractId}`,
     })
     setRelSaving(false)
     if (apprErr) { setError(apprErr.message); return }
     alert('Permintaan approval pengeluaran terkirim ke Director.')
+  }
+
+  async function recordWaste() {
+    if (!contractId || !userId) return
+    const kg = parseFloat(wasteKg)
+    if (!kg || kg <= 0) { setError('Masukkan jumlah waste (kg) yang valid'); return }
+    setWasteSaving(true)
+    setError(null)
+    const { error: insErr } = await supabase.from('waste_records').insert({
+      organization_id: organizationId,
+      contract_id: contractId,
+      product_id: wasteProduct || null,
+      batch_number: wasteBatch || null,
+      quantity_kg: kg,
+      reason: wasteReason,
+      notes: wasteNotes || null,
+      recorded_by: userId,
+    })
+    setWasteSaving(false)
+    if (insErr) { setError(`Gagal menyimpan waste: ${insErr.message}`); return }
+    setWasteKg(''); setWasteBatch(''); setWasteReason('SHRINKAGE'); setWasteNotes(''); setWasteProduct('')
+    await fetchData()
   }
 
   async function recalculateBilling() {
@@ -240,13 +329,13 @@ export default function ContractDetailPage() {
       ],
       lines: [
         {
-          name: 'Estimasi Kapasitas Rental',
-          quantity: contract.total_estimated_kg,
-          unit: 'kg',
+          name: 'Tarif Sewa Penyimpanan',
+          quantity: 1,
+          unit: 'layanan',
           price: contract.price_per_kg_per_day,
         },
       ],
-      totals: [{ label: 'Total Estimasi Kg', value: `${Number(contract.total_estimated_kg).toLocaleString('id-ID')} kg` }],
+      totals: [{ label: 'Tarif per Kg/Hari', value: `Rp ${Number(contract.price_per_kg_per_day).toLocaleString('id-ID')}` }],
       notes: contract.notes,
       signatures: ['Pihak Penyewa', 'Pihak Cold Storage'],
     })
@@ -384,10 +473,21 @@ export default function ContractDetailPage() {
                 <input type="number" placeholder="Jumlah (kg)" value={recvKg} onChange={(e) => setRecvKg(e.target.value)} className="border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary" />
                 <input type="text" placeholder="Batch no." value={recvBatch} onChange={(e) => setRecvBatch(e.target.value)} className="border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary" />
               </div>
+              <select value={recvProduct} onChange={(e) => setRecvProduct(e.target.value)} className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary">
+                <option value="">-- Barang / Produk (opsional) --</option>
+                {products.map((p) => <option key={p.id} value={p.id}>{p.name} ({p.sku})</option>)}
+              </select>
               <div className="grid grid-cols-2 gap-2">
-                <input type="date" value={recvDate} onChange={(e) => setRecvDate(e.target.value)} className="border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary" />
-                <input type="text" placeholder="Catatan" value={recvNotes} onChange={(e) => setRecvNotes(e.target.value)} className="border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary" />
+                <label className="flex flex-col gap-1 text-xs text-slate-500">
+                  Tgl masuk
+                  <input type="date" value={recvDate} onChange={(e) => setRecvDate(e.target.value)} className="border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary" />
+                </label>
+                <label className="flex flex-col gap-1 text-xs text-slate-500">
+                  Tgl expiry
+                  <input type="date" value={recvExpiry} onChange={(e) => setRecvExpiry(e.target.value)} className="border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary" />
+                </label>
               </div>
+              <input type="text" placeholder="Catatan" value={recvNotes} onChange={(e) => setRecvNotes(e.target.value)} className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary" />
               <button onClick={addReceiving} disabled={recvSaving} className="flex items-center gap-2 px-4 py-2 bg-emerald-500 hover:bg-emerald-600 text-white text-sm font-medium rounded-lg transition-colors disabled:opacity-60 w-full justify-center">
                 {recvSaving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Plus className="w-4 h-4" />}
                 <span>Tambah Barang Masuk</span>
@@ -403,6 +503,11 @@ export default function ContractDetailPage() {
                     <div>
                       <p className="text-sm font-medium text-slate-800">{Number(r.received_kg).toLocaleString('id-ID')} kg</p>
                       <p className="text-xs text-slate-500">{r.batch_number ? `Batch: ${r.batch_number}` : ''} {r.notes ? `· ${r.notes}` : ''}</p>
+                      {r.expiry_date && (
+                        <p className={`text-xs mt-0.5 ${new Date(r.expiry_date) <= new Date(Date.now() + 3 * 86400000) ? 'text-red-600 font-medium' : 'text-slate-400'}`}>
+                          Expiry: {new Date(r.expiry_date).toLocaleDateString('id-ID')}
+                        </p>
+                      )}
                     </div>
                     <p className="text-xs text-slate-400">{new Date(r.received_at).toLocaleDateString('id-ID')}</p>
                   </div>
@@ -462,9 +567,70 @@ export default function ContractDetailPage() {
             </div>
           </div>
         </div>
-      </div>
 
-      {/* Pratinjau / cetak kontrak */}
+        {/* Waste / susut */}
+        <div className="bg-white rounded-xl border border-slate-200 p-5">
+          <h2 className="text-sm font-semibold text-slate-600 uppercase tracking-wide flex items-center gap-2 mb-4">
+            <AlertTriangle className="w-4 h-4 text-amber-600" /> Waste / Susut
+          </h2>
+          <p className="text-xs text-slate-500 mb-4">
+            Catat selisih barang yang tidak keluar (susut/rusak/kedaluwarsa). Sistem juga mengirim notifikasi
+            otomatis saat barang mendekati expiry.
+          </p>
+
+          <div className="space-y-3 mb-5">
+            <div className="grid grid-cols-2 gap-2">
+              <input type="number" placeholder="Jumlah waste (kg)" value={wasteKg} onChange={(e) => setWasteKg(e.target.value)} className="border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary" />
+              <input type="text" placeholder="Batch no." value={wasteBatch} onChange={(e) => setWasteBatch(e.target.value)} className="border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary" />
+            </div>
+            <select value={wasteProduct} onChange={(e) => setWasteProduct(e.target.value)} className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary">
+              <option value="">-- Barang / Produk (opsional) --</option>
+              {products.map((p) => <option key={p.id} value={p.id}>{p.name} ({p.sku})</option>)}
+            </select>
+            <div className="grid grid-cols-2 gap-2">
+              <select value={wasteReason} onChange={(e) => setWasteReason(e.target.value)} className="border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary">
+                {Object.entries(WASTE_REASONS).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
+              </select>
+              <input type="text" placeholder="Catatan" value={wasteNotes} onChange={(e) => setWasteNotes(e.target.value)} className="border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary" />
+            </div>
+            <button onClick={recordWaste} disabled={wasteSaving} className="flex items-center gap-2 px-4 py-2 bg-amber-500 hover:bg-amber-600 text-white text-sm font-medium rounded-lg transition-colors disabled:opacity-60 w-full justify-center">
+              {wasteSaving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Plus className="w-4 h-4" />}
+              <span>Catat Waste</span>
+            </button>
+          </div>
+
+          {wasteCandidates.length > 0 && (
+            <div className="mb-5">
+              <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-2">Sisa per Batch (belum keluar)</p>
+              <div className="divide-y divide-slate-100 border border-slate-100 rounded-lg">
+                {wasteCandidates.map((c, i) => (
+                  <div key={i} className="flex items-center justify-between px-3 py-2 text-xs">
+                    <span className="text-slate-600">
+                      Batch {c.batch_number || '-'} · masuk {Number(c.received_kg).toLocaleString('id-ID')} / keluar {Number(c.released_kg).toLocaleString('id-ID')} kg
+                    </span>
+                    <span className="font-mono text-amber-700">{Number(c.diff_kg).toLocaleString('id-ID')} kg</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          <div className="max-h-64 overflow-y-auto divide-y divide-slate-100">
+            {waste.length === 0 ? (
+              <p className="text-sm text-slate-400 text-center py-4">Belum ada catatan waste</p>
+            ) : (
+              waste.map((w) => (                <div key={w.id} className="py-2.5 flex items-center justify-between">
+                  <div>
+                    <p className="text-sm font-medium text-slate-800">{Number(w.quantity_kg).toLocaleString('id-ID')} kg — {WASTE_REASONS[w.reason] ?? w.reason}</p>
+                    <p className="text-xs text-slate-500">{w.batch_number ? `Batch: ${w.batch_number}` : ''} {w.notes ? `· ${w.notes}` : ''}</p>
+                  </div>
+                  <p className="text-xs text-slate-400">{new Date(w.recorded_at).toLocaleDateString('id-ID')}</p>
+                </div>
+              ))
+            )}
+          </div>
+        </div>
+      </div>
       <Modal open={!!printData || loadingPrint} onClose={() => setPrintData(null)} title="Kontrak Rental" size="xl">
         {loadingPrint || !printData ? (
           <div className="py-16 text-center text-slate-400"><Loader2 className="w-6 h-6 animate-spin mx-auto" /></div>

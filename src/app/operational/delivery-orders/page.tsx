@@ -90,7 +90,7 @@ export default function DeliveryOrdersPage() {
   const [reqNotes, setReqNotes] = useState('')
   const [lines, setLines] = useState<RequestLine[]>([emptyLine()])
 
-  const canCreateRequest = roleCode === 'ADMIN' || roleCode === 'DIRECTOR'
+  const canCreateRequest = roleCode === 'ADMIN' || roleCode === 'DIRECTOR' || roleCode === 'SYSTEM_ADMIN'
   const canPrepare = roleCode === 'WAREHOUSE' || roleCode === 'SYSTEM_ADMIN'
 
   useEffect(() => {

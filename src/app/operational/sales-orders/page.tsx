@@ -39,7 +39,7 @@ export default function SalesOrdersPage() {
   const [loadingPrint, setLoadingPrint] = useState(false)
   
 
-  const canAccess = roleCode === 'DIRECTOR' || roleCode === 'ADMIN'
+  const canAccess = roleCode === 'DIRECTOR' || roleCode === 'ADMIN' || roleCode === 'SYSTEM_ADMIN'
 
   useEffect(() => {
     if (!loaded || !canAccess) return

@@ -92,7 +92,7 @@ export default function NewQuotationPage() {
       quotation_date: form.quotation_date,
       valid_until: form.valid_until || null,
       notes: form.notes || null,
-      status: roleCode === 'DIRECTOR' ? 'APPROVED' : 'PENDING_APPROVAL',
+      status: (roleCode === 'DIRECTOR' || roleCode === 'SYSTEM_ADMIN') ? 'APPROVED' : 'PENDING_APPROVAL',
       total_amount: totalAmount,
       created_by: userData.user?.id,
     }).select().single()
@@ -106,7 +106,7 @@ export default function NewQuotationPage() {
     if (lineErr) { setError(lineErr.message); return }
 
     // Create approval request for non-director
-    if (roleCode !== 'DIRECTOR') {
+    if (roleCode !== 'DIRECTOR' && roleCode !== 'SYSTEM_ADMIN') {
       await supabase.from('approval_requests').insert({
         organization_id: organizationId,
         request_type: 'QUOTATION',

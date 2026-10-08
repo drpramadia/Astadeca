@@ -138,11 +138,12 @@ function getVisibleGroups(roleCode: string | null): (NavGroup | NavItem)[] {
       return g.label !== 'Administrasi'
     })
     .map((g) => {
-      // WAREHOUSE: sembunyikan Rates & Billing (hanya admin/director)
+      // WAREHOUSE: hanya Titipan Harian yang bisa diakses di Cold Storage.
+      // Rates, Billing, Rental Inquiry, dan Kontrak khusus ADMIN/DIRECTOR.
       if (roleCode === 'WAREHOUSE' && g.label === 'Cold Storage') {
         return {
           ...g,
-          items: g.items.filter((i) => i.href !== '/cold-storage/rates' && i.href !== '/cold-storage/billing'),
+          items: g.items.filter((i) => i.href === '/cold-storage/spot'),
         }
       }
       return g

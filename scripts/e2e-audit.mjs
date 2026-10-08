@@ -110,12 +110,12 @@ try {
   const mvOut = await client.query("select count(*)::int n from inventory_movements where reference_type='SALES_ORDER' and reference_id=$1", [so.rows[0].id])
   check('SO -> inventory_movement OUT tercatat', mvOut.rows[0].n === 1)
 
-  // ---------- FLOW SEWA: kontrak -> receiving -> billing (14 hari, hari berisi) ----------
+  // ---------- FLOW SEWA: kontrak -> receiving -> billing (mingguan, hari berisi) ----------
   const rc = await client.query('select id from rental_customers where organization_id=$1 limit 1', [ORG])
   const contractNum = (await client.query("select generate_number('KONTRAK') as n")).rows[0].n
   const contract = await client.query(
-    `insert into rental_contracts (organization_id, customer_id, cold_storage_id, contract_number, start_date, end_date, price_per_kg_per_day, total_estimated_kg, status)
-     values ($1,$2,$3,$4, current_date, current_date + 29, 100, 1000, 'ACTIVE') returning id`,
+    `insert into rental_contracts (organization_id, customer_id, cold_storage_id, contract_number, start_date, end_date, price_per_kg_per_day, status)
+     values ($1,$2,$3,$4, current_date, current_date + 29, 100, 'ACTIVE') returning id`,
     [ORG, rc.rows[0].id, cs.rows[0].id, contractNum]
   )
   const contractId = contract.rows[0].id
@@ -128,8 +128,8 @@ try {
   const rb = await client.query('select invoice_number, total_amount, period_start, period_end, status from rental_billing where contract_id=$1', [contractId])
   const periodDays = Math.round((new Date(rb.rows[0].period_end) - new Date(rb.rows[0].period_start)) / 86400000) + 1
   check('Receiving -> rental_billing terbit', rb.rows.length === 1, rb.rows[0]?.invoice_number)
-  check('Billing periode = 14 hari (rolling)', periodDays === 14, `days=${periodDays}`)
-  check('Billing total = 1000kg x 100 x 14hari = 1.400.000', Number(rb.rows[0].total_amount) === 1400000, `total=${rb.rows[0].total_amount}`)
+  check('Billing periode = 7 hari (mingguan, rolling)', periodDays === 7, `days=${periodDays}`)
+  check('Billing total = 1000kg x 100 x 7hari = 700.000', Number(rb.rows[0].total_amount) === 700000, `total=${rb.rows[0].total_amount}`)
   check('Billing status awal SENT', rb.rows[0].status === 'SENT', rb.rows[0].status)
 
   // ---------- FINANCE: payment menutup invoice ----------
@@ -144,8 +144,8 @@ try {
 
   // Partial payment test
   const contract2 = await client.query(
-    `insert into rental_contracts (organization_id, customer_id, cold_storage_id, contract_number, start_date, end_date, price_per_kg_per_day, total_estimated_kg, status)
-     values ($1,$2,$3,$4, current_date, current_date + 13, 100, 500, 'ACTIVE') returning id`,
+    `insert into rental_contracts (organization_id, customer_id, cold_storage_id, contract_number, start_date, end_date, price_per_kg_per_day, status)
+     values ($1,$2,$3,$4, current_date, current_date + 13, 100, 'ACTIVE') returning id`,
     [ORG, rc.rows[0].id, cs.rows[1].id, (await client.query("select generate_number('KONTRAK') as n")).rows[0].n]
   )
   await client.query(

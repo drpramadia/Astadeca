@@ -71,9 +71,24 @@ export default function NotificationBell() {
     return () => document.removeEventListener('mousedown', onClickOutside)
   }, [])
 
+  async function scanWasteExpiry() {
+    // Jalankan pemindaian expiry/waste maksimal sekali per sesi browser dan
+    // hanya bila ada organization_id, agar tidak memicu full-scan tiap navigasi.
+    if (!organizationId) return
+    if (typeof window === 'undefined') return
+    const key = `waste-expiry-scan:${organizationId}`
+    try {
+      if (window.sessionStorage.getItem(key)) return
+      window.sessionStorage.setItem(key, '1')
+    } catch { /* ignore (private mode) */ }
+    // Tidak di-await: jangan menunda pemuatan daftar notifikasi.
+    await supabase.rpc('notify_waste_and_expiry', { p_organization_id: organizationId })
+  }
+
   async function load() {
     if (!userId) return
     setLoading(true)
+    void scanWasteExpiry()
     const [nRes, aRes] = await Promise.all([
       supabase
         .from('notifications')

@@ -36,7 +36,7 @@ export default function NewInquiryPage() {
   const durationDays = watch('duration_days')
   const endDate = computeEndDate(startDate, parseInt(durationDays) || 0)
 
-  const canAccess = roleCode === 'DIRECTOR' || roleCode === 'ADMIN'
+  const canAccess = roleCode === 'DIRECTOR' || roleCode === 'ADMIN' || roleCode === 'SYSTEM_ADMIN'
 
   useEffect(() => {
     if (!loaded) return
@@ -85,7 +85,7 @@ export default function NewInquiryPage() {
       reference_id: inserted.id,
       status: 'PENDING',
       requested_by: uid,
-      notes: 'Permintaan sewa cold storage, menunggu persetujuan.',
+      comment: 'Permintaan sewa cold storage, menunggu persetujuan.',
     })
 
     setSaving(false)

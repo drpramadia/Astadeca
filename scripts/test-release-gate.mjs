@@ -17,8 +17,8 @@ try {
   // kontrak non-spot + receiving -> billing SENT
   const num = (await client.query("select generate_number('KONTRAK') as n")).rows[0].n
   const c = (await client.query(
-    `insert into rental_contracts (organization_id, customer_id, cold_storage_id, contract_number, start_date, end_date, price_per_kg_per_day, total_estimated_kg, status, is_spot)
-     values ($1,$2,$3,$4, current_date, current_date+29, 100, 1000, 'ACTIVE', false) returning id`,
+    `insert into rental_contracts (organization_id, customer_id, cold_storage_id, contract_number, start_date, end_date, price_per_kg_per_day, status, is_spot)
+     values ($1,$2,$3,$4, current_date, current_date+29, 100, 'ACTIVE', false) returning id`,
     [ORG, cust.id, cs.id, num]
   )).rows[0]
   await client.query(`insert into rental_receivings (organization_id, contract_id, received_kg, received_at, received_by) values ($1,$2,1000, now(), $3)`, [ORG, c.id, wh])
@@ -53,7 +53,7 @@ try {
   // spot boleh keluar tanpa cek (sudah bayar di depan)
   const spotNum = (await client.query("select generate_number('SPOT') as n")).rows[0].n
   const spot = (await client.query(
-    `insert into rental_contracts (organization_id, customer_id, cold_storage_id, contract_number, start_date, price_per_kg_per_day, total_estimated_kg, status, is_spot, days_paid) values ($1,$2,$3,$4, current_date, 100, 100, 'ACTIVE', true, 5) returning id`,
+    `insert into rental_contracts (organization_id, customer_id, cold_storage_id, contract_number, start_date, price_per_kg_per_day, spot_kg, status, is_spot, days_paid) values ($1,$2,$3,$4, current_date, 100, 100, 'ACTIVE', true, 5) returning id`,
     [ORG, cust.id, cs.id, spotNum]
   )).rows[0]
   let spotRelease = false

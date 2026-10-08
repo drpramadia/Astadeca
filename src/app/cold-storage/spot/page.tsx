@@ -16,7 +16,7 @@ type Spot = {
   start_date: string
   end_date: string | null
   price_per_kg_per_day: number
-  total_estimated_kg: number
+  spot_kg: number
   is_spot: boolean
   days_paid: number
   days_used: number
@@ -107,7 +107,7 @@ export default function SpotPage() {
         start_date: startDate,
         end_date: null,
         price_per_kg_per_day: RATE,
-        total_estimated_kg: parseFloat(kg),
+        spot_kg: parseFloat(kg),
         status: 'ACTIVE',
         is_spot: true,
         days_paid: 0,
@@ -162,7 +162,7 @@ export default function SpotPage() {
         organization_id: organizationId,
         transaction_date: new Date().toISOString().split('T')[0],
         description: `Perpanjangan ${topupRow.contract_number} — ${topupDays} hari`,
-        amount: Number(topupRow.total_estimated_kg) * RATE * (parseInt(topupDays) || 0),
+        amount: Number(topupRow.spot_kg) * RATE * (parseInt(topupDays) || 0),
         type: 'CREDIT',
         reference_type: 'RENTAL_SPOT',
         reference_id: topupRow.id,
@@ -226,7 +226,7 @@ export default function SpotPage() {
                     <tr key={row.id} className="border-b border-slate-100 hover:bg-slate-50 transition-colors">
                       <td className="px-4 py-3 font-mono font-medium text-cyan-700">{row.contract_number}</td>
                       <td className="px-4 py-3 font-medium text-slate-800">{row.rental_customers?.name ?? '-'}</td>
-                      <td className="px-4 py-3 text-right font-mono text-slate-700">{Number(row.total_estimated_kg).toLocaleString('id-ID')}</td>
+                      <td className="px-4 py-3 text-right font-mono text-slate-700">{Number(row.spot_kg).toLocaleString('id-ID')}</td>
                       <td className="px-4 py-3 text-center font-mono">{row.days_paid}</td>
                       <td className="px-4 py-3 text-center font-mono">{row.days_used}</td>
                       <td className="px-4 py-3 text-center">
@@ -309,7 +309,7 @@ export default function SpotPage() {
           <div className="bg-cyan-50 border border-cyan-200 rounded-lg p-3 flex items-center justify-between">
             <span className="text-sm text-cyan-800">Biaya tambahan</span>
             <span className="font-mono font-semibold text-cyan-900">
-              {formatCurrency(Number(topupRow?.total_estimated_kg ?? 0) * RATE * (parseInt(topupDays) || 0))}
+              {formatCurrency(Number(topupRow?.spot_kg ?? 0) * RATE * (parseInt(topupDays) || 0))}
             </span>
           </div>
           <div className="flex justify-end gap-3 pt-2">
