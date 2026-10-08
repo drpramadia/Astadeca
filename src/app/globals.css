@@ -150,11 +150,12 @@
    dicetak lewat window.print(). Lihat src/lib/print.ts.
    ============================================================ */
 @media print {
-  /* Sembunyikan seluruh halaman, lalu tampilkan HANYA jalur menuju .print-target.
-     Semua ancestor .print-target dipaksa tampil (display:contents agar layout
-     tidak terpengaruh), dan .print-target sendiri jadi blok cetak. */
-  body.printing > * {
-    display: none !important;
+  /* Cetak HANYA dokumen (.print-target), tanpa elemen halaman web.
+     Strategi: sembunyikan semua lewat visibility, lalu tampilkan kembali
+     hanya .print-target + rantai ancestor-nya. visibility (bukan display)
+     membuat sidebar/header/konten lain tidak tampil tanpa merusak layout. */
+  body.printing * {
+    visibility: hidden !important;
   }
 
   body.printing .print-target,
@@ -162,9 +163,10 @@
     visibility: visible !important;
   }
 
-  /* Tampilkan kembali rantai ancestor dari .print-target sampai ke <body>. */
+  /* Rantai ancestor dibuat netral agar tidak menggeser/memotong dokumen. */
   body.printing .print-target-ancestor {
     display: block !important;
+    visibility: visible !important;
     position: static !important;
     overflow: visible !important;
     max-height: none !important;
@@ -175,6 +177,12 @@
     box-shadow: none !important;
     padding: 0 !important;
     margin: 0 !important;
+  }
+
+  /* Semua saudara di jalur dokumen disembunyikan total (sidebar, header,
+     tombol, konten web lain) sehingga hanya dokumen yang tercetak. */
+  body.printing .print-hide {
+    display: none !important;
   }
 
   body.printing .print-target {

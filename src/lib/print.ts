@@ -37,14 +37,30 @@ export function printElement(elementId: string, documentTitle?: string): void {
   document.body.classList.add('printing')
   el.classList.add('print-target')
 
-  // Tandai seluruh ancestor sampai <body> agar baris CSS print bisa
-  // menampilkan kembali jalur menuju elemen cetak (mengatasi blank saat cetak
-  // karena parent-nya ikut disembunyikan).
+  // Tandai seluruh ancestor sampai <body> agar CSS print bisa menampilkan
+  // kembali jalur menuju elemen cetak (mengatasi blank saat cetak karena
+  // parent-nya ikut disembunyikan).
   const ancestors: HTMLElement[] = []
   let node: HTMLElement | null = el.parentElement
   while (node && node !== document.body) {
     node.classList.add('print-target-ancestor')
     ancestors.push(node)
+    node = node.parentElement
+  }
+
+  // Sembunyikan semua SAUDARA di sepanjang jalur agar hanya dokumen yang
+  // tercetak (sidebar, header, tombol, dan konten web lain tidak ikut).
+  const hiddenSiblings: HTMLElement[] = []
+  let child: HTMLElement = el
+  node = el.parentElement
+  while (node && node !== document.body) {
+    Array.from(node.children).forEach((c) => {
+      if (c !== child && c instanceof HTMLElement) {
+        c.classList.add('print-hide')
+        hiddenSiblings.push(c)
+      }
+    })
+    child = node
     node = node.parentElement
   }
 
@@ -57,6 +73,7 @@ export function printElement(elementId: string, documentTitle?: string): void {
     document.body.classList.remove('printing')
     el.classList.remove('print-target')
     ancestors.forEach((a) => a.classList.remove('print-target-ancestor'))
+    hiddenSiblings.forEach((s) => s.classList.remove('print-hide'))
     document.title = previousTitle
     window.removeEventListener('afterprint', cleanup)
   }
