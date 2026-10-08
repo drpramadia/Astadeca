@@ -30,6 +30,7 @@ const TYPE_LABELS: Record<string, string> = {
   SALES_ORDER: 'Sales Order',
   DELIVERY: 'Permintaan Surat Jalan',
   RENTAL_RELEASE: 'Pengeluaran Barang',
+  QUOTATION: 'Penawaran Harga',
 }
 
 export default function ApprovalDetailPage() {
@@ -139,6 +140,39 @@ export default function ApprovalDetailPage() {
             { label: 'Catatan', value: d.notes ?? '-' },
           )
           for (const l of d.delivery_request_lines ?? []) lines.push({ name: l.item_name, qty: `${Number(l.quantity_kg).toLocaleString('id-ID')} kg` })
+        }
+      } else if (a.request_type === 'QUOTATION') {
+        const { data } = await supabase.from('quotations')
+          .select('quotation_number, quotation_date, valid_until, total_amount, notes, customer_name, customers(name), quotation_lines(quantity_kg, price_per_kg, subtotal, description, products(name))')
+          .eq('id', a.reference_id).single()
+        const q = data as unknown as { quotation_number: string; quotation_date: string | null; valid_until: string | null; total_amount: number | null; notes: string | null; customer_name: string | null; customers: { name: string } | null; quotation_lines: { quantity_kg: number; price_per_kg: number; subtotal: number; description: string | null; products: { name: string } | null }[] } | null
+        if (q) {
+          detail.push(
+            { label: 'No. Penawaran', value: q.quotation_number },
+            { label: 'Customer', value: q.customers?.name ?? q.customer_name ?? '-' },
+            { label: 'Tanggal', value: q.quotation_date ? formatDate(q.quotation_date) : '-' },
+            { label: 'Berlaku s/d', value: q.valid_until ? formatDate(q.valid_until) : '-' },
+            { label: 'Total', value: q.total_amount ? formatCurrency(q.total_amount) : '-' },
+            { label: 'Catatan', value: q.notes ?? '-' },
+          )
+          for (const l of q.quotation_lines ?? []) lines.push({ name: l.products?.name ?? l.description ?? '-', qty: `${Number(l.quantity_kg).toLocaleString('id-ID')} kg × ${formatCurrency(l.price_per_kg)}` })
+        }
+      } else if (a.request_type === 'RENTAL_RELEASE') {
+        const { data: c } = await supabase.from('rental_contracts')
+          .select('contract_number, rental_customers(name), cold_storages(name)')
+          .eq('id', a.reference_id).single()
+        const k = c as unknown as { contract_number: string; rental_customers: { name: string } | null; cold_storages: { name: string } | null } | null
+        const { data: rel } = await supabase.from('rental_releases')
+          .select('released_kg, batch_number, released_at, notes')
+          .eq('contract_id', a.reference_id)
+          .order('released_at', { ascending: false })
+        if (k) detail.push(
+          { label: 'No. Kontrak', value: k.contract_number },
+          { label: 'Penyewa', value: k.rental_customers?.name ?? '-' },
+          { label: 'Cold Storage', value: k.cold_storages?.name ?? '-' },
+        )
+        for (const r of (rel as { released_kg: number; batch_number: string | null; released_at: string; notes: string | null }[] | null) ?? []) {
+          lines.push({ name: `Pengeluaran${r.batch_number ? ` batch ${r.batch_number}` : ''}`, qty: `${Number(r.released_kg).toLocaleString('id-ID')} kg` })
         }
       }
     } catch { /* tetap tampilkan apa adanya */ }

@@ -2,16 +2,18 @@
 
 import AppShell from '@/components/app-shell'
 import { useSession } from '@/hooks/use-session'
-import { useEffect, useState } from 'react'
+import { useEffect, useState, Suspense } from 'react'
 import { supabase } from '@/lib/supabase/client'
 import Link from 'next/link'
-import { useRouter } from 'next/navigation'
-import { Loader2, X, Plus, Trash2, Calendar } from 'lucide-react'
+import { useRouter, useSearchParams } from 'next/navigation'
+import { Loader2, X, Plus, Trash2, Calendar, Percent, Boxes } from 'lucide-react'
 import { useForm, useFieldArray } from 'react-hook-form'
 import { formatNumber } from '@/lib/utils'
+import { QuickAddSelect } from '@/components/quick-add-select'
 
 type Customer = { id: string; name: string }
 type Product = { id: string; name: string; sku: string }
+type SupplierQuoteOption = { id: string; quote_number: string; supplier_id: string; suppliers: { name: string } | null }
 
 interface QuotationFormData {
   customer_id: string
@@ -19,18 +21,32 @@ interface QuotationFormData {
   quotation_date: string
   valid_until: string
   notes: string
-  items: { product_id: string; quantity_kg: string; price_per_kg: string; description: string }[]
+  items: { product_id: string; quantity_kg: string; price_per_kg: string; description: string; cost_per_kg: string; markup_percent: string }[]
 }
 
 export default function NewQuotationPage() {
+  return (
+    <Suspense fallback={<AppShell><div className="p-8 text-center text-slate-400">Memuat...</div></AppShell>}>
+      <NewQuotationForm />
+    </Suspense>
+  )
+}
+
+function NewQuotationForm() {
   const { roleCode, loaded, organizationId } = useSession()
   const router = useRouter()
+  const searchParams = useSearchParams()
 
   const [customers, setCustomers] = useState<Customer[]>([])
   const [products, setProducts] = useState<Product[]>([])
   const [saving, setSaving] = useState(false)
   const [loadingRefs, setLoadingRefs] = useState(true)
   const [error, setError] = useState<string | null>(null)
+
+  const [supplierQuotes, setSupplierQuotes] = useState<SupplierQuoteOption[]>([])
+  const [sourceQuoteId, setSourceQuoteId] = useState('')
+  const [markup, setMarkup] = useState('10')
+  const [customerRfqId, setCustomerRfqId] = useState('')
 
   const { register, handleSubmit, watch, setValue, control, formState: { errors } } = useForm<QuotationFormData>({
     defaultValues: {
@@ -39,28 +55,69 @@ export default function NewQuotationPage() {
       quotation_date: new Date().toISOString().split('T')[0],
       valid_until: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
       notes: '',
-      items: [{ product_id: '', quantity_kg: '', price_per_kg: '', description: '' }]
+      items: [{ product_id: '', quantity_kg: '', price_per_kg: '', description: '', cost_per_kg: '', markup_percent: '' }]
     }
   })
-  const { fields, append, remove } = useFieldArray({ control, name: 'items' })
+  const { fields, append, remove, replace } = useFieldArray({ control, name: 'items' })
 
   const canAccess = roleCode === 'DIRECTOR' || roleCode === 'ADMIN' || roleCode === 'SYSTEM_ADMIN'
 
   useEffect(() => {
     if (!loaded) return
     if (!canAccess) { router.push('/operational/quotations'); return }
+    const fromRfq = searchParams.get('customerRfq')
+    if (fromRfq) setCustomerRfqId(fromRfq)
     loadRefs()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [loaded, canAccess])
 
   async function loadRefs() {
     setLoadingRefs(true)
-    const [cRes, pRes] = await Promise.all([
+    const [cRes, pRes, qRes] = await Promise.all([
       supabase.from('customers').select('id, name').eq('organization_id', organizationId).order('name'),
       supabase.from('products').select('id, name, sku').eq('organization_id', organizationId).eq('is_active', true).order('name'),
+      supabase.from('supplier_quotes').select('id, quote_number, supplier_id, suppliers(name)').eq('organization_id', organizationId).order('created_at', { ascending: false }).limit(200),
     ])
     setCustomers(cRes.data || [])
     setProducts(pRes.data || [])
+    setSupplierQuotes((qRes.data as unknown as SupplierQuoteOption[]) || [])
     setLoadingRefs(false)
+  }
+
+  /** Muat baris dari harga supplier lalu terapkan margin (%). */
+  async function applySourceQuote(quoteId: string, markupPercent: number) {
+    setSourceQuoteId(quoteId)
+    if (!quoteId) return
+    const { data } = await supabase
+      .from('supplier_quote_lines')
+      .select('product_id, description, quantity_kg, cost_per_kg')
+      .eq('quote_id', quoteId)
+    const rows = (data as { product_id: string | null; description: string | null; quantity_kg: number; cost_per_kg: number }[]) || []
+    if (rows.length === 0) return
+    replace(rows.map((r) => {
+      const cost = Number(r.cost_per_kg) || 0
+      const sell = cost * (1 + markupPercent / 100)
+      return {
+        product_id: r.product_id ?? '',
+        quantity_kg: String(r.quantity_kg ?? ''),
+        price_per_kg: sell ? String(Math.round(sell)) : '',
+        description: r.description ?? '',
+        cost_per_kg: String(cost),
+        markup_percent: String(markupPercent),
+      }
+    }))
+  }
+
+  /** Hitung ulang semua harga jual dari cost + margin. */
+  function reapplyMarkup(markupPercent: number) {
+    setMarkup(String(markupPercent))
+    fields.forEach((_, idx) => {
+      const cost = parseFloat(watch(`items.${idx}.cost_per_kg`) || '0')
+      if (cost > 0) {
+        setValue(`items.${idx}.price_per_kg`, String(Math.round(cost * (1 + markupPercent / 100))))
+        setValue(`items.${idx}.markup_percent`, String(markupPercent))
+      }
+    })
   }
 
   async function onSubmit(form: QuotationFormData) {
@@ -81,6 +138,8 @@ export default function NewQuotationPage() {
       price_per_kg: parseFloat(item.price_per_kg),
       subtotal: parseFloat(item.quantity_kg) * parseFloat(item.price_per_kg),
       description: item.description,
+      cost_per_kg: parseFloat(item.cost_per_kg || '0') || 0,
+      markup_percent: parseFloat(item.markup_percent || '0') || 0,
     }))
     const totalAmount = lines.reduce((sum, l) => sum + l.subtotal, 0)
 
@@ -94,6 +153,9 @@ export default function NewQuotationPage() {
       notes: form.notes || null,
       status: (roleCode === 'DIRECTOR' || roleCode === 'SYSTEM_ADMIN') ? 'APPROVED' : 'PENDING_APPROVAL',
       total_amount: totalAmount,
+      margin_percent: parseFloat(markup) || 0,
+      supplier_quote_id: sourceQuoteId || null,
+      customer_rfq_id: customerRfqId || null,
       created_by: userData.user?.id,
     }).select().single()
 
@@ -149,6 +211,46 @@ export default function NewQuotationPage() {
           )}
 
           <div className={loadingRefs ? "bg-white rounded-xl border border-slate-200 p-6 space-y-5 opacity-50 pointer-events-none" : "bg-white rounded-xl border border-slate-200 p-6 space-y-5"}>
+            <h2 className="text-sm font-semibold text-slate-600 uppercase tracking-wide flex items-center gap-2">
+              <Boxes className="w-4 h-4 text-primary" /> Sumber Harga Supplier
+            </h2>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1">Harga Supplier (opsional)</label>
+                <select
+                  value={sourceQuoteId}
+                  onChange={(e) => applySourceQuote(e.target.value, parseFloat(markup) || 0)}
+                  className="w-full border border-slate-200 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+                >
+                  <option value="">-- Tanpa sumber (input manual) --</option>
+                  {supplierQuotes.map((q) => (
+                    <option key={q.id} value={q.id}>{q.quote_number} — {q.suppliers?.name ?? '-'}</option>
+                  ))}
+                </select>
+                <p className="text-xs text-slate-400 mt-1">Memilih harga supplier akan mengisi otomatis barang, qty &amp; harga beli.</p>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1 flex items-center gap-1">
+                  <Percent className="w-3.5 h-3.5" /> Margin Keuntungan (%)
+                </label>
+                <div className="flex gap-2">
+                  <input
+                    type="number"
+                    step="0.1"
+                    value={markup}
+                    onChange={(e) => setMarkup(e.target.value)}
+                    className="w-28 border border-slate-200 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+                  />
+                  <button type="button" onClick={() => reapplyMarkup(parseFloat(markup) || 0)} className="px-4 py-2.5 border border-primary/30 text-primary text-sm font-medium rounded-lg hover:bg-primary/5">
+                    Terapkan Margin
+                  </button>
+                </div>
+                <p className="text-xs text-slate-400 mt-1">Harga jual = harga beli + margin. Cost &amp; margin tersimpan untuk audit keuntungan.</p>
+              </div>
+            </div>
+          </div>
+
+          <div className={loadingRefs ? "bg-white rounded-xl border border-slate-200 p-6 space-y-5 opacity-50 pointer-events-none" : "bg-white rounded-xl border border-slate-200 p-6 space-y-5"}>
             <h2 className="text-sm font-semibold text-slate-600 uppercase tracking-wide">Data Penawaran</h2>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -191,7 +293,7 @@ export default function NewQuotationPage() {
           <div className="bg-white rounded-xl border border-slate-200 p-6">
             <div className="flex items-center justify-between mb-4">
               <h2 className="text-sm font-semibold text-slate-600 uppercase tracking-wide">Item Penawaran</h2>
-              <button type="button" onClick={() => append({ product_id: '', quantity_kg: '', price_per_kg: '', description: '' })} className="flex items-center gap-1 text-sm text-cyan-600 hover:text-cyan-700 font-medium">
+              <button type="button" onClick={() => append({ product_id: '', quantity_kg: '', price_per_kg: '', description: '', cost_per_kg: '', markup_percent: '' })} className="flex items-center gap-1 text-sm text-cyan-600 hover:text-cyan-700 font-medium">
                 <Plus className="w-4 h-4" /> Tambah Item
               </button>
             </div>
@@ -228,6 +330,8 @@ export default function NewQuotationPage() {
                     />
                     {errors.items?.[idx]?.price_per_kg && <p className="text-xs text-red-500 mt-1">{errors.items[idx].price_per_kg.message as string}</p>}
                   </div>
+                  <input type="hidden" {...register(`items.${idx}.cost_per_kg`)} />
+                  <input type="hidden" {...register(`items.${idx}.markup_percent`)} />
                   <div className="w-40 pt-2.5 text-sm font-mono text-slate-500 text-right">
                     {watch(`items.${idx}.quantity_kg`) && watch(`items.${idx}.price_per_kg`)
                       ? `Rp ${formatNumber(parseFloat(watch(`items.${idx}.quantity_kg`)) * parseFloat(watch(`items.${idx}.price_per_kg`)))}`

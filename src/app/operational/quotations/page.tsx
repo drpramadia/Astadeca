@@ -4,9 +4,10 @@ import AppShell from '@/components/app-shell'
 import { StatusBadge } from '@/components/ui/status-badge'
 import { useSession } from '@/hooks/use-session'
 import { useEffect, useState } from 'react'
+import { useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabase/client'
 import Link from 'next/link'
-import { Plus, Search, FileSignature, Loader2, Check, X, ArrowRight } from 'lucide-react'
+import { Plus, Search, FileSignature, Loader2, Check, X, ArrowRight, ShoppingCart } from 'lucide-react'
 import { formatCurrency, formatDate } from '@/lib/utils'
 
 type Quotation = {
@@ -35,6 +36,7 @@ const STATUS_OPTIONS = [
 
 export default function QuotationsPage() {
   const { roleCode, loaded, organizationId } = useSession()
+  const router = useRouter()
   const [data, setData] = useState<Quotation[]>([])
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
@@ -91,6 +93,65 @@ export default function QuotationsPage() {
     await supabase.from('quotations').update({ status: 'SENT' }).eq('id', row.id)
     setProcessing(null)
     fetchData()
+  }
+
+  async function markAccepted(row: Quotation) {
+    if (!confirm('Tandai penawaran ini DITERIMA oleh customer?')) return
+    setProcessing(row.id)
+    await supabase.from('quotations').update({ status: 'ACCEPTED' }).eq('id', row.id)
+    setProcessing(null)
+    fetchData()
+  }
+
+  async function createSalesOrder(row: Quotation) {
+    if (!confirm('Buat Sales Order dari penawaran ini?')) return
+    setProcessing(row.id)
+    const { data: userData } = await supabase.auth.getUser()
+
+    const { data: quoteRow } = await supabase
+      .from('quotations')
+      .select('customer_id, customer_name, notes, customer_rfq_id')
+      .eq('id', row.id)
+      .single()
+    const { data: quoteLines } = await supabase
+      .from('quotation_lines')
+      .select('product_id, quantity_kg, price_per_kg, subtotal')
+      .eq('quotation_id', row.id)
+
+    const { data: numberData } = await supabase.rpc('generate_number', { p_prefix: 'SO' })
+    const soNumber = (numberData as string) || `SO/${Date.now()}`
+    const lines = (quoteLines as { product_id: string | null; quantity_kg: number; price_per_kg: number; subtotal: number }[]) || []
+    const total = lines.reduce((s, l) => s + Number(l.subtotal || 0), 0)
+    const q = quoteRow as { customer_id: string | null; customer_name: string | null; notes: string | null; customer_rfq_id: string | null } | null
+
+    if (!q?.customer_id) {
+      setProcessing(null)
+      alert('Penawaran ini tidak punya customer terdaftar. Daftarkan customer dulu sebelum membuat Sales Order.')
+      return
+    }
+
+    const { data: inserted, error: insErr } = await supabase.from('sales_orders').insert({
+      organization_id: organizationId,
+      customer_id: q.customer_id,
+      so_number: soNumber,
+      status: 'APPROVED',
+      order_date: new Date().toISOString().slice(0, 10),
+      total_amount: total,
+      quotation_id: row.id,
+      customer_rfq_id: q.customer_rfq_id,
+      notes: q.notes,
+      created_by: userData.user?.id,
+    }).select().single()
+
+    if (insErr || !inserted) { setProcessing(null); alert(insErr?.message ?? 'Gagal membuat Sales Order.'); return }
+
+    const { error: lineErr } = await supabase.from('sales_order_lines').insert(
+      lines.map((l) => ({ so_id: inserted.id, product_id: l.product_id, quantity_kg: l.quantity_kg, price_per_kg: l.price_per_kg, subtotal: l.subtotal }))
+    )
+    setProcessing(null)
+    if (lineErr) { alert(lineErr.message); return }
+    alert(`Sales Order ${soNumber} berhasil dibuat.`)
+    router.push(`/operational/sales-orders/${inserted.id}`)
   }
 
   const filtered = data.filter((r) => {
@@ -220,6 +281,24 @@ export default function QuotationsPage() {
                             className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-cyan-100 text-cyan-700 hover:bg-cyan-200 text-xs font-medium transition-colors disabled:opacity-50"
                           >
                             <ArrowRight className="w-3.5 h-3.5" /> Kirim
+                          </button>
+                        )}
+                        {row.status === 'SENT' && (
+                          <button
+                            onClick={() => markAccepted(row)}
+                            disabled={processing === row.id}
+                            className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-green-100 text-green-700 hover:bg-green-200 text-xs font-medium transition-colors disabled:opacity-50"
+                          >
+                            <Check className="w-3.5 h-3.5" /> Diterima Customer
+                          </button>
+                        )}
+                        {row.status === 'ACCEPTED' && (
+                          <button
+                            onClick={() => createSalesOrder(row)}
+                            disabled={processing === row.id}
+                            className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-primary/10 text-primary hover:bg-primary/20 text-xs font-medium transition-colors disabled:opacity-50"
+                          >
+                            <ShoppingCart className="w-3.5 h-3.5" /> Buat Sales Order
                           </button>
                         )}
                       </div>

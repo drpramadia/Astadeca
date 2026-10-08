@@ -69,7 +69,7 @@ async function rpc(fn, args, token) {
   return { status: res.status, body: await res.json().catch(() => null) }
 }
 
-const created = { supplier_items: [], customer_items: [], waste_records: [], approval_requests: [], contracts: [] }
+const created = { supplier_items: [], customer_items: [], waste_records: [], approval_requests: [], contracts: [], customer_rfq: [], customer_rfq_lines: [], supplier_rfq: [], stock_waste: [] }
 
 try {
   const users = { sysadmin: 'drpramadia', director: 'ratih.cinthia', admin: 'gian', warehouse: 'siswoko' }
@@ -141,6 +141,42 @@ try {
     check('anon TIDAK bisa baca waste_records', Array.isArray(anonRead.body) && anonRead.body.length === 0, `n=${anonRead.body?.length}`)
   }
 
+  // ---------- RFQ FLOW (customer -> supplier) ----------
+  const rfqNum = (await rpc('generate_rfq_number', { p_prefix: 'RFQC' }, S.admin.accessToken)).body
+  check('ADMIN bisa generate_rfq_number', typeof rfqNum === 'string' && rfqNum.startsWith('RFQC/'), `got ${rfqNum}`)
+
+  const insRfq = await ins('customer_rfq', [{ organization_id: ORG, rfq_number: rfqNum, customer_id: customerId, status: 'OPEN' }], S.admin.accessToken)
+  check('ADMIN bisa insert customer_rfq', insRfq.status === 201, `status=${insRfq.status}`)
+  let rfqId
+  if (Array.isArray(insRfq.body) && insRfq.body[0]?.id) { rfqId = insRfq.body[0].id; created.customer_rfq.push(rfqId) }
+
+  if (rfqId && productIds[0]) {
+    const insLine = await ins('customer_rfq_lines', [{ rfq_id: rfqId, product_id: productIds[0], quantity_kg: 100 }], S.admin.accessToken)
+    check('ADMIN bisa insert customer_rfq_lines', insLine.status === 201, `status=${insLine.status}`)
+    if (Array.isArray(insLine.body) && insLine.body[0]?.id) created.customer_rfq_lines.push(insLine.body[0].id)
+  }
+
+  if (rfqId && supplierId) {
+    const sRfqNum = (await rpc('generate_rfq_number', { p_prefix: 'RFQS' }, S.admin.accessToken)).body
+    const insSRfq = await ins('supplier_rfq', [{ organization_id: ORG, rfq_number: sRfqNum, customer_rfq_id: rfqId, supplier_id: supplierId, status: 'SENT' }], S.admin.accessToken)
+    check('ADMIN bisa insert supplier_rfq', insSRfq.status === 201, `status=${insSRfq.status}`)
+    if (Array.isArray(insSRfq.body) && insSRfq.body[0]?.id) created.supplier_rfq.push(insSRfq.body[0].id)
+  }
+
+  const anonRfq = await q('customer_rfq', 'id', ANON)
+  check('anon TIDAK bisa baca customer_rfq', Array.isArray(anonRfq.body) && anonRfq.body.length === 0, `n=${anonRfq.body?.length}`)
+
+  // ---------- stock_waste (supply chain) ----------
+  if (productIds[0]) {
+    const insStockWaste = await ins('stock_waste', [{ organization_id: ORG, product_id: productIds[0], quantity_kg: 2, reason: 'EXPIRY' }], S.warehouse.accessToken)
+    check('WAREHOUSE bisa insert stock_waste', insStockWaste.status === 201, `status=${insStockWaste.status}`)
+    if (Array.isArray(insStockWaste.body) && insStockWaste.body[0]?.id) created.stock_waste.push(insStockWaste.body[0].id)
+    const exp = await rpc('inventory_expiring', { p_organization_id: ORG, p_days: 30 }, S.admin.accessToken)
+    check('ADMIN bisa panggil inventory_expiring', exp.status === 200 && Array.isArray(exp.body), `status=${exp.status}`)
+    const notifExp = await rpc('notify_inventory_expiry', { p_organization_id: ORG }, S.admin.accessToken)
+    check('ADMIN bisa panggil notify_inventory_expiry', notifExp.status === 200, `status=${notifExp.status}`)
+  }
+
   // ---------- RPC waste_candidates & notify_waste_and_expiry ----------
   const candAdmin = await rpc('waste_candidates', { p_organization_id: ORG }, S.admin.accessToken)
   check('ADMIN bisa panggil waste_candidates', candAdmin.status === 200 && Array.isArray(candAdmin.body), `status=${candAdmin.status}`)
@@ -177,6 +213,10 @@ try {
   for (const id of created.waste_records) await fetch(`${URL}/rest/v1/waste_records?id=eq.${id}`, { method: 'DELETE', headers: svcH })
   for (const id of created.supplier_items) await fetch(`${URL}/rest/v1/supplier_items?id=eq.${id}`, { method: 'DELETE', headers: svcH })
   for (const id of created.customer_items) await fetch(`${URL}/rest/v1/customer_items?id=eq.${id}`, { method: 'DELETE', headers: svcH })
+  for (const id of created.stock_waste) await fetch(`${URL}/rest/v1/stock_waste?id=eq.${id}`, { method: 'DELETE', headers: svcH })
+  for (const id of created.supplier_rfq) await fetch(`${URL}/rest/v1/supplier_rfq?id=eq.${id}`, { method: 'DELETE', headers: svcH })
+  for (const id of created.customer_rfq_lines) await fetch(`${URL}/rest/v1/customer_rfq_lines?id=eq.${id}`, { method: 'DELETE', headers: svcH })
+  for (const id of created.customer_rfq) await fetch(`${URL}/rest/v1/customer_rfq?id=eq.${id}`, { method: 'DELETE', headers: svcH })
 }
 
 const failed = results.filter((r) => !r.ok && !r.n.startsWith('INFO'))

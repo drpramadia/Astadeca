@@ -22,6 +22,7 @@ import {
 } from 'lucide-react'
 import { supabase } from '@/lib/supabase/client'
 import { formatCurrency, formatNumber } from '@/lib/utils'
+import { BarChart, DonutChart } from '@/components/charts'
 
 function StatCard({
   label,
@@ -131,6 +132,10 @@ export default function DashboardPage() {
   const [loading, setLoading] = useState(true)
   const [activities, setActivities] = useState<{ id: string; type: string; label: string; time: string }[]>([])
 
+  const [rangeDays, setRangeDays] = useState(30)
+  const [chartLoading, setChartLoading] = useState(false)
+  const [monthly, setMonthly] = useState<{ labels: string[]; revenue: number[]; expense: number[]; sales: number[]; purchase: number[] }>({ labels: [], revenue: [], expense: [], sales: [], purchase: [] })
+
   useEffect(() => {
     if (loaded && !userId) {
       router.replace('/login')
@@ -142,6 +147,56 @@ export default function DashboardPage() {
     loadStats()
     loadActivities()
   }, [loaded, userId, organizationId])
+
+  useEffect(() => {
+    if (!loaded || !userId || !organizationId || !canSeeFinance) return
+    loadCharts()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [loaded, userId, organizationId, rangeDays])
+
+  async function loadCharts() {
+    setChartLoading(true)
+    const since = new Date()
+    since.setDate(since.getDate() - rangeDays)
+    const sinceISO = since.toISOString().slice(0, 10)
+
+    const [txRes, soRes, poRes] = await Promise.all([
+      supabase.from('transactions').select('amount, type, transaction_date').eq('organization_id', organizationId).gte('transaction_date', sinceISO),
+      supabase.from('sales_orders').select('total_amount, order_date').eq('organization_id', organizationId).gte('order_date', sinceISO),
+      supabase.from('purchase_orders').select('total_amount, order_date').eq('organization_id', organizationId).gte('order_date', sinceISO),
+    ])
+
+    // Susun bucket per bulan (maks 6 bulan terakhir dalam rentang)
+    const buckets: { key: string; label: string }[] = []
+    for (let i = 5; i >= 0; i--) {
+      const d = new Date(); d.setDate(1); d.setMonth(d.getMonth() - i)
+      buckets.push({ key: d.toISOString().slice(0, 7), label: d.toLocaleDateString('id-ID', { month: 'short' }) })
+    }
+    const idx = (dateStr: string | null) => {
+      if (!dateStr) return -1
+      const k = String(dateStr).slice(0, 7)
+      return buckets.findIndex((b) => b.key === k)
+    }
+    const revenue = new Array(6).fill(0)
+    const expense = new Array(6).fill(0)
+    const sales = new Array(6).fill(0)
+    const purchase = new Array(6).fill(0)
+
+    ;(txRes.data || []).forEach((t: { amount: number; type: string; transaction_date: string }) => {
+      const i = idx(t.transaction_date); if (i < 0) return
+      if (t.type === 'CREDIT') revenue[i] += Number(t.amount) || 0
+      else expense[i] += Number(t.amount) || 0
+    })
+    ;(soRes.data || []).forEach((s: { total_amount: number; order_date: string }) => {
+      const i = idx(s.order_date); if (i >= 0) sales[i] += Number(s.total_amount) || 0
+    })
+    ;(poRes.data || []).forEach((p: { total_amount: number; order_date: string }) => {
+      const i = idx(p.order_date); if (i >= 0) purchase[i] += Number(p.total_amount) || 0
+    })
+
+    setMonthly({ labels: buckets.map((b) => b.label), revenue, expense, sales, purchase })
+    setChartLoading(false)
+  }
 
   async function loadActivities() {
     const { data } = await supabase
@@ -315,6 +370,59 @@ export default function DashboardPage() {
           </div>
         )}
 
+        {/* Analitik interaktif (keuangan & penjualan) */}
+        {canSeeFinance && (
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
+            <div className="lg:col-span-2 bg-white rounded-xl border border-slate-200 p-5">
+              <div className="flex items-center justify-between mb-4">
+                <div className="flex items-center gap-2">
+                  <BarChart3 className="w-4 h-4 text-cyan-600" />
+                  <h3 className="text-sm font-semibold text-slate-800">Pemasukan, Pengeluaran, Penjualan &amp; Pembelian</h3>
+                </div>
+                <select value={rangeDays} onChange={(e) => setRangeDays(Number(e.target.value))} className="border border-slate-200 rounded-lg px-2.5 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-primary">
+                  <option value={30}>30 hari</option>
+                  <option value={90}>90 hari</option>
+                  <option value={180}>180 hari</option>
+                  <option value={365}>1 tahun</option>
+                </select>
+              </div>
+              {chartLoading ? (
+                <div className="h-56 flex items-center justify-center text-slate-400"><Snowflake className="w-5 h-5 animate-pulse" /></div>
+              ) : (
+                <BarChart
+                  labels={monthly.labels}
+                  series={[
+                    { name: 'Pemasukan', color: '#22c55e', values: monthly.revenue },
+                    { name: 'Pengeluaran', color: '#ef4444', values: monthly.expense },
+                    { name: 'Penjualan', color: '#0ea5e9', values: monthly.sales },
+                    { name: 'Pembelian', color: '#f59e0b', values: monthly.purchase },
+                  ]}
+                  height={220}
+                  valueFormat={(n) => formatCurrency(n)}
+                />
+              )}
+            </div>
+
+            <div className="bg-white rounded-xl border border-slate-200 p-5">
+              <div className="flex items-center gap-2 mb-4">
+                <Activity className="w-4 h-4 text-cyan-600" />
+                <h3 className="text-sm font-semibold text-slate-800">Untung / Rugi</h3>
+              </div>
+              <div className="text-center mb-4">
+                <p className={`text-2xl font-bold ${stats.totalRevenue - stats.totalExpense >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                  {formatCurrency(stats.totalRevenue - stats.totalExpense)}
+                </p>
+                <p className="text-xs text-slate-400 mt-1">Pemasukan − Pengeluaran</p>
+              </div>
+              <div className="space-y-2 text-sm">
+                <div className="flex justify-between"><span className="text-slate-500">Pemasukan</span><span className="font-medium text-green-600">{formatCurrency(stats.totalRevenue)}</span></div>
+                <div className="flex justify-between"><span className="text-slate-500">Pengeluaran</span><span className="font-medium text-red-600">{formatCurrency(stats.totalExpense)}</span></div>
+                <div className="flex justify-between"><span className="text-slate-500">Piutang Tagihan</span><span className="font-medium text-slate-700">{formatCurrency(stats.pendingPayment)}</span></div>
+              </div>
+            </div>
+          </div>
+        )}
+
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           {/* Quick links */}
           <div className="lg:col-span-2">
@@ -348,6 +456,23 @@ export default function DashboardPage() {
 
           {/* Right column */}
           <div className="space-y-6">
+            {/* Kapasitas cold storage */}
+            <div className="bg-white rounded-xl border border-slate-200 p-5">
+              <div className="flex items-center gap-2 mb-4">
+                <Snowflake className="w-4 h-4 text-cyan-600" />
+                <h3 className="text-sm font-semibold text-slate-800">Sisa Kapasitas Cold Storage</h3>
+              </div>
+              <DonutChart
+                centerValue={stats.coldStorageUnits > 0 ? `${Math.max(0, 100 - stats.utilization)}%` : '-'}
+                centerLabel="tersedia"
+                segments={[
+                  { label: 'Terpakai', value: stats.utilization, color: '#086b76' },
+                  { label: 'Tersedia', value: Math.max(0, 100 - stats.utilization), color: '#22c55e' },
+                ]}
+              />
+              <p className="text-xs text-slate-400 mt-3 text-center">{stats.coldStorageUnits} unit cold storage · {stats.activeContracts} kontrak aktif</p>
+            </div>
+
             {/* Warehouse overview */}
             <div className="bg-white rounded-xl border border-slate-200 p-5">
               <div className="flex items-center gap-2 mb-4">

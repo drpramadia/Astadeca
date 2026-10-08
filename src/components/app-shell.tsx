@@ -29,6 +29,7 @@ import {
   FileSignature,
   Database,
   Settings,
+  AlertTriangle,
 } from 'lucide-react'
 import { useSession } from '@/hooks/use-session'
 import NotificationBell from '@/components/notification-bell'
@@ -71,7 +72,10 @@ const NAV_GROUPS: NavGroup[] = [
     label: 'Penjualan & Pembelian',
     icon: Truck,
     items: [
-      { label: 'Permintaan Harga', href: '/operational/quotations', icon: FileSignature },
+      { label: 'Permintaan Harga', href: '/operational/rfq-customer', icon: FileSignature },
+      { label: 'RFQ Supplier', href: '/operational/rfq-supplier', icon: PackageSearch },
+      { label: 'Harga Supplier', href: '/operational/supplier-quotes', icon: DollarSign },
+      { label: 'Penawaran Harga', href: '/operational/quotations', icon: FileText },
       { label: 'Purchase Order', href: '/operational/purchase-orders', icon: ShoppingCart },
       { label: 'Sales Order', href: '/operational/sales-orders', icon: FileText },
       { label: 'Surat Jalan', href: '/operational/delivery-orders', icon: Truck },
@@ -84,6 +88,7 @@ const NAV_GROUPS: NavGroup[] = [
       { label: 'Penerimaan Barang', href: '/warehouse/goods-receipts', icon: ArrowDownToLine },
       { label: 'Pengeluaran Barang', href: '/warehouse/goods-issues', icon: ArrowUpFromLine },
       { label: 'Inventory', href: '/warehouse/inventory', icon: Boxes },
+      { label: 'Waste & Expiry', href: '/warehouse/waste', icon: AlertTriangle },
       { label: 'Keranjang & Lokasi', href: '/warehouse/baskets', icon: Boxes },
       { label: 'QC Inspection', href: '/warehouse/qc', icon: ClipboardCheck },
     ],

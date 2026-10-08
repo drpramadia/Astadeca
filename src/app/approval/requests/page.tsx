@@ -25,6 +25,7 @@ const TYPE_LABELS: Record<string, string> = {
   SALES_ORDER: 'Sales Order',
   DELIVERY: 'Permintaan Surat Jalan',
   RENTAL_RELEASE: 'Pengeluaran Barang',
+  QUOTATION: 'Penawaran Harga',
 }
 
 export default function ApprovalPage() {
@@ -72,6 +73,7 @@ export default function ApprovalPage() {
       else if (t === 'CONTRACT') await supabase.from('rental_contracts').update({ status: 'ACTIVE' }).eq('id', refId)
       else if (t === 'DELIVERY') await supabase.from('delivery_requests').update({ status: 'APPROVED' }).eq('id', refId)
       else if (t === 'RENTAL_INQUIRY') await supabase.from('rental_inquiries').update({ status: 'APPROVED' }).eq('id', refId)
+      else if (t === 'QUOTATION') await supabase.from('quotations').update({ status: 'APPROVED' }).eq('id', refId)
     }
     setProcessing(null)
     fetchData()

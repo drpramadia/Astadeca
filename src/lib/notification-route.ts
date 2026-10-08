@@ -35,7 +35,7 @@ export function notificationHref(
     case 'RENTAL_RELEASE':
       return opts.canApprove && referenceId ? `/approval/requests/${referenceId}` : '/cold-storage/contracts'
     case 'RENTAL_BILLING':
-      return '/cold-storage/billing'
+      return referenceId ? `/cold-storage/billing/${referenceId}` : '/cold-storage/billing'
 
     // Waste/expiry -> buka detail kontrak (ada bagian Waste)
     case 'WASTE_EXPIRY':

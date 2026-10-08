@@ -41,6 +41,7 @@ export default function CustomersPage() {
   const [editId, setEditId] = useState<string | null>(null)
   const [products, setProducts] = useState<{ id: string; name: string; sku: string }[]>([])
   const [itemIds, setItemIds] = useState<string[]>([])
+  const [newProduct, setNewProduct] = useState({ open: false, name: '', sku: '', saving: false, error: null as string | null })
 
   useEffect(() => {
     if (!loaded) return
@@ -57,6 +58,26 @@ export default function CustomersPage() {
       .order('name')
       .limit(1000)
     setProducts((rows as { id: string; name: string; sku: string }[]) || [])
+  }
+
+  async function createProduct() {
+    const name = newProduct.name.trim()
+    const sku = newProduct.sku.trim()
+    if (!name || !sku) { setNewProduct((s) => ({ ...s, error: 'Nama dan SKU wajib diisi.' })); return }
+    setNewProduct((s) => ({ ...s, saving: true, error: null }))
+    const { data: inserted, error } = await supabase
+      .from('products')
+      .insert({ organization_id: organizationId, name, sku, is_active: true })
+      .select('id, name, sku')
+      .single()
+    if (error || !inserted) {
+      setNewProduct((s) => ({ ...s, saving: false, error: error?.message ?? 'Gagal menambah barang.' }))
+      return
+    }
+    const p = inserted as { id: string; name: string; sku: string }
+    setProducts((prev) => [...prev, p].sort((a, b) => a.name.localeCompare(b.name)))
+    setItemIds((prev) => [...prev, p.id])
+    setNewProduct({ open: false, name: '', sku: '', saving: false, error: null })
   }
 
   async function fetchData() {
@@ -297,9 +318,44 @@ export default function CustomersPage() {
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1">
-                Barang yang Dibutuhkan {itemIds.length > 0 && <span className="text-primary">({itemIds.length} dipilih)</span>}
-              </label>
+              <div className="flex items-center justify-between mb-1">
+                <label className="block text-sm font-medium text-slate-700">
+                  Barang yang Dibutuhkan {itemIds.length > 0 && <span className="text-primary">({itemIds.length} dipilih)</span>}
+                </label>
+                <button
+                  type="button"
+                  onClick={() => setNewProduct((s) => ({ ...s, open: !s.open, error: null }))}
+                  className="text-xs font-medium text-primary hover:text-primary/80"
+                >
+                  + Tambah barang baru
+                </button>
+              </div>
+              {newProduct.open && (
+                <div className="mb-2 p-3 bg-cyan-50 border border-cyan-200 rounded-lg space-y-2">
+                  {newProduct.error && <p className="text-xs text-red-600">{newProduct.error}</p>}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                    <input
+                      autoFocus
+                      value={newProduct.name}
+                      onChange={(e) => setNewProduct((s) => ({ ...s, name: e.target.value }))}
+                      placeholder="Nama barang (mis. Sayur Bayam)"
+                      className="border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+                    />
+                    <input
+                      value={newProduct.sku}
+                      onChange={(e) => setNewProduct((s) => ({ ...s, sku: e.target.value }))}
+                      placeholder="SKU (unik, mis. SYR-001)"
+                      className="border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+                    />
+                  </div>
+                  <div className="flex justify-end gap-2">
+                    <button type="button" onClick={() => setNewProduct({ open: false, name: '', sku: '', saving: false, error: null })} className="px-3 py-1.5 text-xs text-slate-600 hover:bg-white rounded-lg">Batal</button>
+                    <button type="button" onClick={createProduct} disabled={newProduct.saving} className="px-3 py-1.5 text-xs font-medium text-white bg-primary rounded-lg disabled:opacity-60">
+                      {newProduct.saving ? 'Menyimpan...' : 'Simpan & Pilih'}
+                    </button>
+                  </div>
+                </div>
+              )}
               <div className="border border-slate-200 rounded-lg p-3 max-h-48 overflow-y-auto grid grid-cols-2 sm:grid-cols-3 gap-2">
                 {products.length === 0 ? (
                   <p className="text-xs text-slate-400 col-span-full">Belum ada produk. Tambahkan di Master Produk.</p>

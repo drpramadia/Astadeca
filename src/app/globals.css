@@ -103,6 +103,43 @@
 .dark tr.border-b { border-color: #1c2942 !important; }
 .dark .hover\:bg-slate-50:hover { background-color: #16202f !important; }
 
+/* Badge status & warna aksen (-100 / -700 / -200) agar tetap kontras */
+.dark .bg-green-100 { background-color: #12341f !important; }
+.dark .bg-amber-100 { background-color: #3a2f12 !important; }
+.dark .bg-red-100 { background-color: #3a1717 !important; }
+.dark .bg-cyan-100 { background-color: #0e3038 !important; }
+.dark .bg-blue-100 { background-color: #16294a !important; }
+.dark .bg-primary\/10 { background-color: rgba(8, 107, 118, 0.25) !important; }
+
+.dark .text-green-700, .dark .text-green-600 { color: #6ee7a8 !important; }
+.dark .text-amber-700, .dark .text-amber-600 { color: #fbbf6e !important; }
+.dark .text-red-700, .dark .text-red-600 { color: #f88f8f !important; }
+.dark .text-cyan-700, .dark .text-cyan-600 { color: #67e8f9 !important; }
+.dark .text-blue-700 { color: #93c5fd !important; }
+
+.dark .hover\:bg-green-200:hover { background-color: #17492b !important; }
+.dark .hover\:bg-red-200:hover { background-color: #4a1e1e !important; }
+.dark .hover\:bg-cyan-200:hover { background-color: #12414d !important; }
+.dark .hover\:bg-primary\/20:hover { background-color: rgba(8, 107, 118, 0.35) !important; }
+
+.dark .border-green-200 { border-color: #1c4a2c !important; }
+.dark .border-red-200 { border-color: #4a1e1e !important; }
+.dark .border-amber-200 { border-color: #4a3a14 !important; }
+.dark .border-cyan-200 { border-color: #12414d !important; }
+.dark .border-cyan-300 { border-color: #155e6b !important; }
+
+.dark .divide-slate-100 > :not([hidden]) ~ :not([hidden]) { border-color: #1c2942 !important; }
+.dark .divide-slate-200 > :not([hidden]) ~ :not([hidden]) { border-color: #24324a !important; }
+
+/* Placeholder & disabled */
+.dark input:disabled, .dark select:disabled { opacity: 0.6; }
+.dark .text-slate-300 { color: #5b6b82 !important; }
+
+/* SVG chart fills di dark */
+.dark .fill-slate-800 { fill: #e8eef7 !important; }
+.dark .fill-slate-400 { fill: #7d8ca3 !important; }
+.dark .text-slate-200 { color: #24324a !important; }
+
 /* Scrollbar global di dark */
 .dark ::-webkit-scrollbar-track { background: #0b1220; }
 .dark ::-webkit-scrollbar-thumb { background: #24324a; }

@@ -14,6 +14,7 @@ import {
   Loader2,
   BellOff,
   X,
+  Eye,
 } from 'lucide-react'
 
 type Notification = {
@@ -135,6 +136,12 @@ export default function NotificationBell() {
   }
 
   async function decide(id: string, decision: 'APPROVED' | 'REJECTED') {
+    const ok = confirm(
+      decision === 'APPROVED'
+        ? 'Setujui permintaan ini? Pastikan Anda sudah membuka & memeriksa dokumennya (tombol "Lihat Dokumen").'
+        : 'Tolak permintaan ini?'
+    )
+    if (!ok) return
     setProcessing(id)
     const { data: userData } = await supabase.auth.getUser()
     const row = approvals.find((a) => a.id === id)
@@ -251,24 +258,30 @@ export default function NotificationBell() {
                           {a.profiles_requested?.full_name ?? '-'} · {formatDate(a.created_at)}
                         </p>
                       </div>
-                      <div className="flex items-center gap-1 flex-shrink-0">
-                        <button
-                          onClick={() => decide(a.id, 'APPROVED')}
-                          disabled={processing === a.id}
-                          className="flex items-center justify-center w-8 h-8 rounded-lg bg-green-100 text-green-700 hover:bg-green-200 transition-colors disabled:opacity-50"
-                          title="Setujui"
-                        >
-                          {processing === a.id ? <Loader2 className="w-4 h-4 animate-spin" /> : <Check className="w-4 h-4" />}
-                        </button>
-                        <button
-                          onClick={() => decide(a.id, 'REJECTED')}
-                          disabled={processing === a.id}
-                          className="flex items-center justify-center w-8 h-8 rounded-lg bg-red-100 text-red-700 hover:bg-red-200 transition-colors disabled:opacity-50"
-                          title="Tolak"
-                        >
-                          <X className="w-4 h-4" />
-                        </button>
-                      </div>
+                    </div>
+                    <div className="flex items-center gap-2 mt-2">
+                      <button
+                        onClick={() => { setOpen(false); router.push(`/approval/requests/${a.id}`) }}
+                        className="flex-1 flex items-center justify-center gap-1.5 px-3 py-1.5 text-xs font-medium text-primary border border-primary/30 rounded-lg hover:bg-primary/5 transition-colors"
+                      >
+                        <Eye className="w-3.5 h-3.5" /> Lihat Dokumen
+                      </button>
+                      <button
+                        onClick={() => decide(a.id, 'APPROVED')}
+                        disabled={processing === a.id}
+                        className="flex items-center justify-center gap-1 px-3 py-1.5 text-xs font-medium rounded-lg bg-green-100 text-green-700 hover:bg-green-200 transition-colors disabled:opacity-50"
+                        title="Setujui langsung"
+                      >
+                        {processing === a.id ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Check className="w-3.5 h-3.5" />} Setujui
+                      </button>
+                      <button
+                        onClick={() => decide(a.id, 'REJECTED')}
+                        disabled={processing === a.id}
+                        className="flex items-center justify-center gap-1 px-3 py-1.5 text-xs font-medium rounded-lg bg-red-100 text-red-700 hover:bg-red-200 transition-colors disabled:opacity-50"
+                        title="Tolak langsung"
+                      >
+                        <X className="w-3.5 h-3.5" /> Tolak
+                      </button>
                     </div>
                   </div>
                 ))}

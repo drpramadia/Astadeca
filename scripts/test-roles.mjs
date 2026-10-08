@@ -6,8 +6,8 @@
 const DASHBOARD = { label: 'Dashboard' }
 const NAV_GROUPS = [
   { label: 'Cold Storage', items: ['/cold-storage/inquiries', '/cold-storage/contracts', '/cold-storage/spot', '/cold-storage/rates', '/cold-storage/billing'] },
-  { label: 'Penjualan & Pembelian', items: ['/operational/quotations', '/operational/purchase-orders', '/operational/sales-orders', '/operational/delivery-orders'] },
-  { label: 'Warehouse', items: ['/warehouse/goods-receipts', '/warehouse/goods-issues', '/warehouse/inventory', '/warehouse/baskets', '/warehouse/qc'] },
+  { label: 'Penjualan & Pembelian', items: ['/operational/rfq-customer', '/operational/rfq-supplier', '/operational/supplier-quotes', '/operational/quotations', '/operational/purchase-orders', '/operational/sales-orders', '/operational/delivery-orders'] },
+  { label: 'Warehouse', items: ['/warehouse/goods-receipts', '/warehouse/goods-issues', '/warehouse/inventory', '/warehouse/waste', '/warehouse/baskets', '/warehouse/qc'] },
   { label: 'Keuangan', items: ['/finance/transactions', '/finance/reports', '/finance/payments'] },
   { label: 'Data Master', items: ['/master/products', '/master/customers', '/master/suppliers'] },
   { label: 'Dokumen', items: ['/documents'] },

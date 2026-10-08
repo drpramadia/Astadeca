@@ -7,6 +7,7 @@ import { DocumentPrintView, type DocumentPrintData } from '@/components/document
 import { useSession } from '@/hooks/use-session'
 import { useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabase/client'
+import Link from 'next/link'
 import { Search, DollarSign, Loader2, Printer, Plus, X } from 'lucide-react'
 
 type Billing = {
@@ -68,14 +69,24 @@ export default function BillingPage() {
     setIssuing(true)
     setIssueError(null)
     const { data, error } = await supabase.rpc('calculate_rental_billing', { p_contract_id: contractId })
-    setIssuing(false)
-    if (error) { setIssueError(error.message); return }
+    if (error) { setIssuing(false); setIssueError(error.message); return }
     const row = Array.isArray(data) ? data[0] : data
     const invNum = (row as { out_invoice_number?: string } | null)?.out_invoice_number
+    const amount = Number((row as { out_total_amount?: number } | null)?.out_total_amount ?? 0)
+    setIssuing(false)
     setShowIssue(false)
     setContractId('')
     await fetchData()
-    if (invNum) alert(`Invoice ${invNum} berhasil diterbitkan.`)
+    if (!invNum) {
+      setIssueError('Invoice tidak terbit. Pastikan kontrak sudah memiliki barang masuk pada periode berjalan.')
+      setShowIssue(true)
+      return
+    }
+    if (amount <= 0) {
+      alert(`Invoice ${invNum} terbit dengan total Rp 0 (belum ada barang masuk pada periode ini). Tagihan akan terisi otomatis saat barang dicatat masuk/keluar.`)
+    } else {
+      alert(`Invoice ${invNum} berhasil diterbitkan.`)
+    }
   }
 
   async function fetchData() {
@@ -177,7 +188,9 @@ export default function BillingPage() {
               ) : (
                 filtered.map((row) => (
                   <tr key={row.id} className="border-b border-slate-100 hover:bg-slate-50 transition-colors">
-                    <td className="px-4 py-3 font-mono font-medium text-cyan-700">{row.invoice_number}</td>
+                    <td className="px-4 py-3 font-mono font-medium">
+                      <Link href={`/cold-storage/billing/${row.id}`} className="text-cyan-700 hover:text-cyan-900 hover:underline">{row.invoice_number}</Link>
+                    </td>
                     <td className="px-4 py-3 font-mono text-slate-600 text-xs">{row.rental_contracts?.contract_number ?? '-'}</td>
                     <td className="px-4 py-3 font-medium text-slate-800">{(row as any).rental_customers?.name ?? '-'}</td>
                     <td className="px-4 py-3 text-right font-mono font-semibold text-slate-800">Rp {row.total_amount.toLocaleString('id-ID')}</td>
