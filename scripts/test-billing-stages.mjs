@@ -103,15 +103,15 @@ try {
   check('invoice terbit', bill.status === 200 && !!b?.out_invoice_number, `inv=${b?.out_invoice_number}`)
 
   const billing = (await sel('rental_billing', `contract_id=eq.${created.contract}&select=id,invoice_number,period_start,period_end,total_amount,status`, T))?.[0]
-  const lines = billing?.id ? await sel('rental_billing_lines', `billing_id=eq.${billing.id}&select=description,quantity_kg,price_per_kg,subtotal`, T) : []
-  const line = lines?.[0]
+  const lines = billing?.id ? await sel('rental_billing_lines', `billing_id=eq.${billing.id}&select=description,quantity_kg,price_per_kg,subtotal&order=description`, T) : []
 
   console.log('\n--- Hasil penagihan ---')
   console.log(`  Invoice   : ${billing?.invoice_number}`)
   console.log(`  Periode   : ${billing?.period_start} s/d ${billing?.period_end}`)
-  console.log(`  Keterangan: ${line?.description}`)
-  console.log(`  kg-hari   : ${line?.quantity_kg}`)
-  console.log(`  tarif     : ${line?.price_per_kg} /kg/hari`)
+  console.log(`  Baris     : ${lines.length} (1 baris per hari)`)
+  const sumKgDay = (lines || []).reduce((s, l) => s + Number(l.quantity_kg || 0), 0)
+  for (const l of lines || []) console.log(`    ${l.description}  =>  ${Number(l.subtotal).toLocaleString('id-ID')}`)
+  console.log(`  kg-hari   : ${sumKgDay}`)
   console.log(`  TOTAL     : Rp ${Number(billing?.total_amount ?? 0).toLocaleString('id-ID')}`)
 
   // Ekspektasi kg-hari per hari (GREATEST(sisa,1000)):
@@ -126,7 +126,14 @@ try {
   const daysInPeriod = Math.round((new Date(billing?.period_end) - new Date(billing?.period_start)) / 864e5) + 1
   const expectedKgDay = 10000
   const expectedTotal = expectedKgDay * 100
-  check('kg-hari = 10.000 (2000+2000+1500+1500 min1000x3)', Number(line?.quantity_kg) === expectedKgDay, `kg-hari=${line?.quantity_kg} expected=${expectedKgDay}`)
+  check('rincian = 1 baris per hari dalam periode', lines.length === daysInPeriod, `baris=${lines.length} hari=${daysInPeriod}`)
+  check('kg-hari = 10.000 (2000+2000+1500+1500 min1000x3)', sumKgDay === expectedKgDay, `kg-hari=${sumKgDay} expected=${expectedKgDay}`)
+
+  // Snapshot harian tersimpan (jejak audit)
+  const usage = await sel('rental_daily_usage', `contract_id=eq.${created.contract}&select=usage_date,actual_kg,billed_kg,subtotal&order=usage_date`, T)
+  check('snapshot harian tersimpan (rental_daily_usage)', (usage || []).length === daysInPeriod, `baris snap=${(usage || []).length}`)
+  const snapKg = (usage || []).reduce((s, u) => s + Number(u.billed_kg || 0), 0)
+  check('akumulasi snapshot == kg-hari invoice', snapKg === sumKgDay, `snap=${snapKg} invoice=${sumKgDay}`)
   check('total penagihan = 10.000 x Rp100 = Rp1.000.000', Number(billing?.total_amount) === expectedTotal, `total=${billing?.total_amount} expected=${expectedTotal}`)
   check('periode mencakup hari berjalan', daysInPeriod >= 1, `${daysInPeriod} hari`)
 

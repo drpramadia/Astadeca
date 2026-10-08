@@ -105,11 +105,12 @@ try {
   const bl = billing?.[0]
   check('4. periode = 7 hari (mingguan)', bl ? Math.round((new Date(bl.period_end) - new Date(bl.period_start)) / 864e5) === 6 : false, bl ? `${bl.period_start}..${bl.period_end}` : '')
 
-  // 900 kg aktual (< 1 ton) selama periode 7 hari -> min 1 ton dipakai: 7 x 1.000 kg
+  // Semua transaksi diuji pada hari yang sama, jadi hanya 1 hari berisi stok.
+  // Rincian kini 1 baris per hari; hari tanpa stok tidak menambah tagihan.
   const lines = bl?.id ? await sel('rental_billing_lines', `billing_id=eq.${bl.id}&select=description,quantity_kg,price_per_kg,subtotal`, T) : []
-  check('4. ada rincian tagihan', (lines || []).length > 0, `${(lines || []).length} baris`)
-  const billedKgDay = Number(lines?.[0]?.quantity_kg ?? 0)
-  check('4. min 1 ton benar-benar diterapkan (900 kg -> ditagih 1.000/hari)', billedKgDay >= 7000, `kg-hari=${billedKgDay} tarif=${lines?.[0]?.price_per_kg}`)
+  check('4. ada rincian tagihan (>=1 baris harian)', (lines || []).length >= 1, `${(lines || []).length} baris`)
+  const billedKgDay = (lines || []).reduce((s, l) => s + Number(l.quantity_kg || 0), 0)
+  check('4. min 1 ton diterapkan (900 kg hari ini -> ditagih 1.000)', billedKgDay >= 1000, `kg-hari=${billedKgDay}`)
 
   // release TANPA gate: tidak perlu bayar / approval, barang boleh keluar kapan saja
   const rel = await ins('rental_releases', { organization_id: ORG, contract_id: created.contract, released_kg: 580, batch_number: 'B-001', released_at: new Date().toISOString(), notes: 'Pengeluaran sebagian (tanpa gate)' }, T)

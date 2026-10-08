@@ -87,6 +87,17 @@
 - Input perjanjian penagihan dilakukan saat membuat kontrak (form kontrak):
   tarif per kg/hari + opsi minimum 1 ton.
 
+## Snapshot Harian & Rincian Penagihan (per migrasi 024)
+- `rental_daily_usage` menyimpan snapshot per hari per kontrak:
+  `usage_date`, `actual_kg` (stok riil), `billed_kg` (kg ditagih, min 1 ton bila
+  diaktifkan), `rate`, `subtotal`. Dibangun ulang via
+  `rebuild_rental_daily_usage(contract_id)` — dipicu otomatis setiap barang
+  masuk/keluar (trigger `refresh_daily_usage_on_receiving`/`_on_release`).
+- `calculate_rental_billing` mengakumulasi snapshot periode dan membuat
+  SATU BARIS INVOICE PER HARI (hari berisi stok; hari kosong tidak menagih).
+- Alur: barang masuk/keluar dicatat per hari -> snapshot harian -> saat
+  penagihan, snapshot dijumlahkan menjadi total invoice.
+
 ## Permissions
 ADMIN: rental.*, inventory.*, purchase.*, sales.*, finance.*, admin.*, documents.*, reports.*
 WAREHOUSE: inventory.view, inventory.receive, inventory.issue, qc.*
