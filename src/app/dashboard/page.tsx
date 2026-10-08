@@ -19,6 +19,7 @@ import {
   BarChart3,
   Activity,
   FileSignature,
+  AlertTriangle,
 } from 'lucide-react'
 import { supabase } from '@/lib/supabase/client'
 import { formatCurrency, formatNumber } from '@/lib/utils'
@@ -125,9 +126,14 @@ export default function DashboardPage() {
     activeContracts2: 0,
     pendingBillings: 0,
     utilization: 0,
+    capacityKg: 0,
+    storedKg: 0,
     totalRevenue: 0,
     totalExpense: 0,
     pendingPayment: 0,
+    unpaidInvoices: 0,
+    overdueInvoices: 0,
+    needIssue: 0,
   })
   const [loading, setLoading] = useState(true)
   const [activities, setActivities] = useState<{ id: string; type: string; label: string; time: string }[]>([])
@@ -205,14 +211,42 @@ export default function DashboardPage() {
       .eq('organization_id', organizationId)
       .order('performed_at', { ascending: false })
       .limit(6)
-    setActivities(
-      ((data as unknown as { id: string; movement_type: string; quantity_kg: number; performed_at: string; products: { name: string } | null }[]) || []).map((m) => ({
-        id: m.id,
-        type: m.movement_type,
-        label: `${m.movement_type === 'IN' ? 'Masuk' : 'Keluar'} ${Number(m.quantity_kg).toLocaleString('id-ID')} kg — ${m.products?.name ?? '-'}`,
-        time: new Date(m.performed_at).toLocaleString('id-ID', { dateStyle: 'medium', timeStyle: 'short' }),
+
+    let rows = ((data as unknown as { id: string; movement_type: string; quantity_kg: number; performed_at: string; products: { name: string } | null }[]) || []).map((m) => ({
+      id: m.id,
+      type: m.movement_type,
+      label: `${m.movement_type === 'IN' ? 'Masuk' : 'Keluar'} ${Number(m.quantity_kg).toLocaleString('id-ID')} kg — ${m.products?.name ?? '-'}`,
+      time: new Date(m.performed_at).toLocaleString('id-ID', { dateStyle: 'medium', timeStyle: 'short' }),
+    }))
+
+    // Fallback: bila belum ada pergerakan inventory, tampilkan aktivitas sewa
+    // (barang masuk/keluar cold storage) agar panel tidak kosong.
+    if (rows.length === 0) {
+      const [recvRes, relRes] = await Promise.all([
+        supabase.from('rental_receivings').select('id, received_kg, received_at, batch_number').eq('organization_id', organizationId).order('received_at', { ascending: false }).limit(4),
+        supabase.from('rental_releases').select('id, released_kg, released_at, batch_number').eq('organization_id', organizationId).order('released_at', { ascending: false }).limit(4),
+      ])
+      const recv = ((recvRes.data as unknown as { id: string; received_kg: number; received_at: string; batch_number: string | null }[]) || []).map((r) => ({
+        id: 'recv-' + r.id,
+        type: 'IN',
+        label: `Masuk ${Number(r.received_kg).toLocaleString('id-ID')} kg — batch ${r.batch_number ?? '-'}`,
+        time: new Date(r.received_at).toLocaleString('id-ID', { dateStyle: 'medium', timeStyle: 'short' }),
+        _at: r.received_at,
       }))
-    )
+      const rel = ((relRes.data as unknown as { id: string; released_kg: number; released_at: string; batch_number: string | null }[]) || []).map((r) => ({
+        id: 'rel-' + r.id,
+        type: 'OUT',
+        label: `Keluar ${Number(r.released_kg).toLocaleString('id-ID')} kg — batch ${r.batch_number ?? '-'}`,
+        time: new Date(r.released_at).toLocaleString('id-ID', { dateStyle: 'medium', timeStyle: 'short' }),
+        _at: r.released_at,
+      }))
+      rows = [...recv, ...rel]
+        .sort((a, b) => (a._at < b._at ? 1 : -1))
+        .slice(0, 6)
+        .map(({ _at, ...rest }) => rest)
+    }
+
+    setActivities(rows)
   }
 
   async function loadStats() {
@@ -225,7 +259,7 @@ export default function DashboardPage() {
 
       const coldStorageRes = await supabase
         .from('cold_storages')
-        .select('id, status', { count: 'exact', head: true })
+        .select('id, capacity_kg', { count: 'exact' })
         .eq('organization_id', organizationId)
 
       // Inventory breakdown
@@ -239,22 +273,26 @@ export default function DashboardPage() {
       })
 
       const coldStorageUnits = coldStorageRes.count || 0
+      const capacityKg = (coldStorageRes.data || []).reduce((s, r) => s + Number((r as { capacity_kg: number }).capacity_kg || 0), 0)
 
       // Data operasional & keuangan hanya untuk role yang berhak
       let activeContracts = 0, pendingPO = 0, pendingSO = 0, deliveryOrders = 0
       let totalRevenue = 0, totalExpense = 0, pendingPayment = 0
+      let storedKg = 0, unpaidInvoices = 0, overdueInvoices = 0, needIssue = 0
 
       if (canSeeOps) {
-        const [activeContractsRes, pendingPORes, pendingSORes, deliveryOrdersRes] = await Promise.all([
+        const [activeContractsRes, pendingPORes, pendingSORes, deliveryOrdersRes, totalItemsRes] = await Promise.all([
           supabase.from('rental_contracts').select('id', { count: 'exact', head: true }).eq('organization_id', organizationId).eq('status', 'ACTIVE'),
           supabase.from('purchase_orders').select('id', { count: 'exact', head: true }).eq('organization_id', organizationId).eq('status', 'PENDING_APPROVAL'),
           supabase.from('sales_orders').select('id', { count: 'exact', head: true }).eq('organization_id', organizationId).eq('status', 'PENDING_APPROVAL'),
           supabase.from('delivery_orders').select('id', { count: 'exact', head: true }).eq('organization_id', organizationId),
+          supabase.from('inventory').select('quantity_kg').eq('organization_id', organizationId),
         ])
         activeContracts = activeContractsRes.count || 0
         pendingPO = pendingPORes.count || 0
         pendingSO = pendingSORes.count || 0
         deliveryOrders = deliveryOrdersRes.count || 0
+        storedKg = (totalItemsRes.data || []).reduce((s, r) => s + Number((r as { quantity_kg: number }).quantity_kg || 0), 0)
       }
 
       if (canSeeFinance) {
@@ -265,10 +303,33 @@ export default function DashboardPage() {
         ])
         totalRevenue = (revenueRes.data || []).reduce((sum, r) => sum + Number(r.amount), 0)
         totalExpense = (expenseRes.data || []).reduce((sum, r) => sum + Number(r.amount), 0)
-        pendingPayment = (billings.data || []).reduce((sum, b) => sum + Number(b.total_amount || 0), 0)
+        const openBills = billings.data || []
+        pendingPayment = openBills.reduce((sum, b) => sum + Number(b.total_amount || 0), 0)
+        unpaidInvoices = openBills.filter((b) => b.status === 'SENT').length
+        overdueInvoices = openBills.filter((b) => b.status === 'OVERDUE').length
       }
 
-      const utilization = coldStorageUnits > 0 ? Math.min(100, Math.round((activeContracts / coldStorageUnits) * 100)) : 0
+      // Utilization = stok tersimpan vs total kapasitas (bukan kontrak vs unit).
+      // storedKg dari inventory; fallback ke stok rental (receivings - releases).
+      let effectiveStored = storedKg
+      if (effectiveStored === 0) {
+        const [recvRes, relRes] = await Promise.all([
+          supabase.from('rental_receivings').select('received_kg').eq('organization_id', organizationId),
+          supabase.from('rental_releases').select('released_kg').eq('organization_id', organizationId),
+        ])
+        const inKg = (recvRes.data || []).reduce((s, r) => s + Number((r as { received_kg: number }).received_kg || 0), 0)
+        const outKg = (relRes.data || []).reduce((s, r) => s + Number((r as { released_kg: number }).released_kg || 0), 0)
+        effectiveStored = Math.max(0, inKg - outKg)
+      }
+
+      const utilization = capacityKg > 0 ? Math.round((effectiveStored / capacityKg) * 100) : 0
+
+      // Sinkronkan status tagihan (SENT lewat periode -> OVERDUE) & kirim
+      // pengingat penagihan agar tidak terlewat (dedupe di sisi DB).
+      if (canSeeFinance) {
+        await supabase.rpc('mark_overdue_rental_billing', { p_organization_id: organizationId }).then(() => {}, () => {})
+        await supabase.rpc('notify_rental_billing_due', { p_organization_id: organizationId }).then(() => {}, () => {})
+      }
 
       setStats({
         activeContracts,
@@ -281,11 +342,16 @@ export default function DashboardPage() {
         quarantineItems,
         coldStorageUnits,
         activeContracts2: activeContracts,
-        pendingBillings: pendingPayment > 0 ? 1 : 0,
+        pendingBillings: unpaidInvoices + overdueInvoices,
         utilization,
+        capacityKg,
+        storedKg: effectiveStored,
         totalRevenue,
         totalExpense,
         pendingPayment,
+        unpaidInvoices,
+        overdueInvoices,
+        needIssue: 0,
       })
     } catch (e) {
       console.error('Failed to load stats:', e)
@@ -460,18 +526,67 @@ export default function DashboardPage() {
             <div className="bg-white rounded-xl border border-slate-200 p-5">
               <div className="flex items-center gap-2 mb-4">
                 <Snowflake className="w-4 h-4 text-cyan-600" />
-                <h3 className="text-sm font-semibold text-slate-800">Sisa Kapasitas Cold Storage</h3>
+                <h3 className="text-sm font-semibold text-slate-800">Kapasitas Cold Storage</h3>
               </div>
-              <DonutChart
-                centerValue={stats.coldStorageUnits > 0 ? `${Math.max(0, 100 - stats.utilization)}%` : '-'}
-                centerLabel="tersedia"
-                segments={[
-                  { label: 'Terpakai', value: stats.utilization, color: '#086b76' },
-                  { label: 'Tersedia', value: Math.max(0, 100 - stats.utilization), color: '#22c55e' },
-                ]}
-              />
-              <p className="text-xs text-slate-400 mt-3 text-center">{stats.coldStorageUnits} unit cold storage · {stats.activeContracts} kontrak aktif</p>
+              {stats.capacityKg > 0 ? (
+                <>
+                  <DonutChart
+                    centerValue={`${stats.utilization}%`}
+                    centerLabel="terpakai"
+                    segments={[
+                      { label: 'Terpakai', value: Math.min(100, stats.utilization), color: stats.utilization > 100 ? '#ef4444' : '#086b76' },
+                      { label: 'Tersedia', value: Math.max(0, 100 - stats.utilization), color: '#22c55e' },
+                    ]}
+                  />
+                  <div className="mt-3 space-y-1 text-xs text-center">
+                    <p className="text-slate-500">
+                      <span className="font-semibold text-slate-800">{formatNumber(stats.storedKg)} kg</span> tersimpan dari{' '}
+                      <span className="font-semibold text-slate-800">{formatNumber(stats.capacityKg)} kg</span>
+                    </p>
+                    <p className="text-slate-400">{stats.coldStorageUnits} unit · {stats.activeContracts} kontrak aktif</p>
+                    {stats.utilization > 100 && (
+                      <p className="text-red-600 font-medium">Melebihi kapasitas {stats.utilization - 100}%</p>
+                    )}
+                  </div>
+                </>
+              ) : (
+                <p className="text-sm text-slate-400 text-center py-6">Belum ada unit cold storage dengan kapasitas.</p>
+              )}
             </div>
+
+            {/* Penagihan / Billing — monitoring agar tidak terlewat */}
+            {canSeeFinance && (
+              <div className="bg-white rounded-xl border border-slate-200 p-5">
+                <div className="flex items-center justify-between mb-4">
+                  <div className="flex items-center gap-2">
+                    <DollarSign className="w-4 h-4 text-cyan-600" />
+                    <h3 className="text-sm font-semibold text-slate-800">Penagihan</h3>
+                  </div>
+                  <Link href="/cold-storage/billing" className="text-xs text-cyan-700 hover:underline">Kelola</Link>
+                </div>
+                <div className="space-y-3">
+                  <div className="flex justify-between items-center">
+                    <span className="text-xs text-slate-500">Perlu Ditagih (belum lunas)</span>
+                    <span className="text-sm font-semibold text-amber-600">{stats.unpaidInvoices + stats.overdueInvoices} invoice</span>
+                  </div>
+                  <div className="flex justify-between items-center">
+                    <span className="text-xs text-slate-500">Jatuh Tempo</span>
+                    <span className={`text-sm font-semibold ${stats.overdueInvoices > 0 ? 'text-red-600' : 'text-slate-800'}`}>{stats.overdueInvoices} invoice</span>
+                  </div>
+                  <div className="flex justify-between items-center">
+                    <span className="text-xs text-slate-500">Nilai Tagihan</span>
+                    <span className="text-sm font-semibold text-slate-800">{formatCurrency(stats.pendingPayment)}</span>
+                  </div>
+                </div>
+                {stats.pendingBillings > 0 ? (
+                  <Link href="/cold-storage/billing" className="mt-4 flex items-center justify-center gap-2 w-full px-3 py-2 bg-amber-50 border border-amber-200 text-amber-800 text-xs font-medium rounded-lg hover:bg-amber-100 transition-colors">
+                    <AlertTriangle className="w-3.5 h-3.5" /> Ada {stats.pendingBillings} tagihan menunggu
+                  </Link>
+                ) : (
+                  <p className="mt-4 text-center text-xs text-emerald-600 bg-emerald-50 border border-emerald-200 rounded-lg py-2">Tidak ada tagihan tertunggak</p>
+                )}
+              </div>
+            )}
 
             {/* Warehouse overview */}
             <div className="bg-white rounded-xl border border-slate-200 p-5">

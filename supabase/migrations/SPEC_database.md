@@ -107,6 +107,17 @@
 - Snapshot harian (`refresh_daily_usage_*`) tetap berjalan otomatis agar
   kg per hari tetap tercatat.
 
+## Monitoring & Notifikasi Penagihan (per migrasi 026)
+- `notify_rental_billing_due(org_id)` mengirim notifikasi ke ADMIN/DIRECTOR/
+  SYSTEM_ADMIN untuk invoice SENT (pengingat) & OVERDUE (jatuh tempo).
+  Route notifikasi `RENTAL_BILLING` -> halaman detail invoice.
+- `mark_overdue_rental_billing(org_id)` menandai invoice SENT yang lewat
+  periode menjadi OVERDUE.
+- Dashboard memanggil keduanya saat dimuat (role finance) sebagai monitoring.
+- Dashboard: panel "Penagihan" menampilkan jumlah invoice belum lunas,
+  jatuh tempo, dan nilai tagihan; chart kapasitas memakai stok tersimpan vs
+  total kapasitas (bukan jumlah kontrak).
+
 ## Permissions
 ADMIN: rental.*, inventory.*, purchase.*, sales.*, finance.*, admin.*, documents.*, reports.*
 WAREHOUSE: inventory.view, inventory.receive, inventory.issue, qc.*
