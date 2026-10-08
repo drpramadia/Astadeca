@@ -76,35 +76,32 @@ try {
   }, T)
   check('1. approval request inquiry dibuat', ap.status === 201, `status=${ap.status}`)
 
-  // 2. Director menyetujui -> inquiry harus jadi CONVERTED (bukan APPROVED yang invalid)
+  // 2. Director menyetujui -> otomatis jadi kontrak + inquiry CONVERTED
   const badUpdate = await patch('rental_inquiries', `id=eq.${created.inquiry}`, { status: 'APPROVED' }, T)
   check('2. [bukti bug] status APPROVED ditolak constraint', badUpdate.status === 400, `HTTP ${badUpdate.status}`)
 
-  const okUpdate = await patch('rental_inquiries', `id=eq.${created.inquiry}`, { status: 'CONVERTED' }, T)
-  check('2. approval -> status CONVERTED berhasil', okUpdate.status === 200 || okUpdate.status === 204, `HTTP ${okUpdate.status}`)
+  const conv = await rpc('rental_inquiry_to_contract', { p_inquiry_id: created.inquiry }, T)
+  const convRow = Array.isArray(conv.body) ? conv.body[0] : conv.body
+  check('2. approve inquiry -> kontrak otomatis dibuat', conv.status === 200 && !!convRow?.out_contract_id, `contract=${convRow?.out_contract_number}`)
+  created.contract = convRow?.out_contract_id
   const after = (await sel('rental_inquiries', `id=eq.${created.inquiry}&select=status`, T))?.[0]
   check('2. inquiry kini CONVERTED', after?.status === 'CONVERTED', `status=${after?.status}`)
 
-  // 3. Buat kontrak dari inquiry (data penyewa & periode mengikuti)
-  const contractNumber = (await rpc('generate_number', { p_prefix: 'KONTRAK' }, T)).body || `KONTRAK/${Date.now()}`
-  const ctr = await ins('rental_contracts', {
-    organization_id: ORG, customer_id: created.customer, cold_storage_id: store.id,
-    contract_number: contractNumber, start_date: new Date().toISOString().slice(0, 10),
-    end_date: new Date(Date.now() + 30 * 864e5).toISOString().slice(0, 10),
-    price_per_kg_per_day: 100, minimum_1_ton: true, status: 'ACTIVE', is_spot: false, created_by: s.userId,
-  }, T)
-  check('3. kontrak dibuat dari inquiry (ACTIVE)', ctr.status === 201 && ctr.body?.[0]?.status === 'ACTIVE', `status=${ctr.body?.[0]?.status}`)
-  created.contract = ctr.body?.[0]?.id
+  // 2b. Idempoten: approve ulang tidak membuat kontrak ganda
+  const conv2 = await rpc('rental_inquiry_to_contract', { p_inquiry_id: created.inquiry }, T)
+  const convRow2 = Array.isArray(conv2.body) ? conv2.body[0] : conv2.body
+  check('2b. approve ulang tidak bikin kontrak ganda', convRow2?.out_contract_id === created.contract && convRow2?.out_created === false, `created=${convRow2?.out_created}`)
 
-  const ctrRead = (await sel('rental_contracts', `id=eq.${created.contract}&select=contract_number,customer_id,cold_storage_id,minimum_1_ton`, T))?.[0]
+  // 3. Kontrak otomatis terhubung ke penyewa & cold storage inquiry + min 1 ton
+  const ctrRead = (await sel('rental_contracts', `id=eq.${created.contract}&select=contract_number,customer_id,cold_storage_id,minimum_1_ton,status`, T))?.[0]
   check('3. kontrak terhubung ke penyewa & cold storage inquiry',
     ctrRead?.customer_id === created.customer && ctrRead?.cold_storage_id === store.id,
     `cust=${ctrRead?.customer_id === created.customer} cs=${ctrRead?.cold_storage_id === store.id}`)
-  check('3. kontrak membawa perjanjian minimum 1 ton', ctrRead?.minimum_1_ton === true, `min_1_ton=${ctrRead?.minimum_1_ton}`)
+  check('3. kontrak ACTIVE + perjanjian minimum 1 ton', ctrRead?.status === 'ACTIVE' && ctrRead?.minimum_1_ton === true, `status=${ctrRead?.status} min_1_ton=${ctrRead?.minimum_1_ton}`)
 
   console.log('\nRingkasan alur:')
   console.log(`  Inquiry    : ${created.inquiry} -> CONVERTED`)
-  console.log(`  Kontrak    : ${contractNumber} (ACTIVE, min 1 ton)`)
+  console.log(`  Kontrak    : ${ctrRead?.contract_number} (otomatis, ACTIVE, min 1 ton)`)
 } catch (e) {
   console.error('ERROR:', e.message)
   process.exitCode = 1

@@ -201,7 +201,11 @@ export default function ApprovalDetailPage() {
       else if (t === 'SALES_ORDER') ({ error: docErr } = await supabase.from('sales_orders').update({ status: 'APPROVED' }).eq('id', refId))
       else if (t === 'CONTRACT') ({ error: docErr } = await supabase.from('rental_contracts').update({ status: 'ACTIVE' }).eq('id', refId))
       else if (t === 'DELIVERY') ({ error: docErr } = await supabase.from('delivery_requests').update({ status: 'APPROVED' }).eq('id', refId))
-      else if (t === 'RENTAL_INQUIRY') ({ error: docErr } = await supabase.from('rental_inquiries').update({ status: 'CONVERTED' }).eq('id', refId))
+      else if (t === 'RENTAL_INQUIRY') {
+        // Approve inquiry -> otomatis buat kontrak sewa + inquiry jadi CONVERTED
+        const { error: rpcErr } = await supabase.rpc('rental_inquiry_to_contract', { p_inquiry_id: refId })
+        docErr = rpcErr
+      }
     } else {
       if (t === 'PURCHASE_ORDER') ({ error: docErr } = await supabase.from('purchase_orders').update({ status: 'REJECTED' }).eq('id', refId))
       else if (t === 'SALES_ORDER') ({ error: docErr } = await supabase.from('sales_orders').update({ status: 'REJECTED' }).eq('id', refId))

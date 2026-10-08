@@ -69,7 +69,10 @@ export default function ApprovalPage() {
       else if (t === 'SALES_ORDER') ({ error: docErr } = await supabase.from('sales_orders').update({ status: 'APPROVED' }).eq('id', refId))
       else if (t === 'CONTRACT') ({ error: docErr } = await supabase.from('rental_contracts').update({ status: 'ACTIVE' }).eq('id', refId))
       else if (t === 'DELIVERY') ({ error: docErr } = await supabase.from('delivery_requests').update({ status: 'APPROVED' }).eq('id', refId))
-      else if (t === 'RENTAL_INQUIRY') ({ error: docErr } = await supabase.from('rental_inquiries').update({ status: 'CONVERTED' }).eq('id', refId))
+      else if (t === 'RENTAL_INQUIRY') {
+        const { error: rpcErr } = await supabase.rpc('rental_inquiry_to_contract', { p_inquiry_id: refId })
+        docErr = rpcErr
+      }
       else if (t === 'QUOTATION') ({ error: docErr } = await supabase.from('quotations').update({ status: 'APPROVED' }).eq('id', refId))
       if (docErr) { alert(`Gagal memperbarui dokumen: ${docErr.message}`); setProcessing(null); return }
     }
