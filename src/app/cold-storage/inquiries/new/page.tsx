@@ -6,7 +6,7 @@ import { useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabase/client'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { Plus, Search, FileText, ArrowRight, Loader2, X } from 'lucide-react'
+import { Plus, Search, FileText, ArrowRight, Loader2, X, UserPlus } from 'lucide-react'
 import { useForm } from 'react-hook-form'
 import { computeEndDate } from '@/lib/rental-dates'
 import { formatDate } from '@/lib/utils'
@@ -23,8 +23,15 @@ export default function NewInquiryPage() {
   const [saving, setSaving] = useState(false)
   const [loadingRefs, setLoadingRefs] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [showAddCustomer, setShowAddCustomer] = useState(false)
+  const [savingNewCustomer, setSavingNewCustomer] = useState(false)
+  const [newCustomerError, setNewCustomerError] = useState<string | null>(null)
+  const [newCustomerName, setNewCustomerName] = useState('')
+  const [newCustomerEmail, setNewCustomerEmail] = useState('')
+  const [newCustomerPhone, setNewCustomerPhone] = useState('')
+  const [newCustomerAddress, setNewCustomerAddress] = useState('')
 
-  const { register, handleSubmit, watch, formState: { errors } } = useForm({
+  const { register, handleSubmit, watch, setValue, formState: { errors } } = useForm({
     defaultValues: {
       customer_id: '', cold_storage_id: '', notes: '',
       start_date: new Date().toISOString().slice(0, 10),
@@ -53,6 +60,49 @@ export default function NewInquiryPage() {
     setCustomers(cRes.data || [])
     setColdStorages(csRes.data || [])
     setLoadingRefs(false)
+  }
+
+  function resetNewCustomerForm() {
+    setNewCustomerName('')
+    setNewCustomerEmail('')
+    setNewCustomerPhone('')
+    setNewCustomerAddress('')
+    setNewCustomerError(null)
+  }
+
+  async function handleAddCustomer() {
+    const name = newCustomerName.trim()
+    if (!name) {
+      setNewCustomerError('Nama customer wajib diisi.')
+      return
+    }
+    if (!organizationId) {
+      setNewCustomerError('Organisasi tidak ditemukan. Silakan login ulang.')
+      return
+    }
+
+    setSavingNewCustomer(true)
+    setNewCustomerError(null)
+    const { data: customerId, error: insertError } = await supabase.rpc('create_rental_customer', {
+      p_organization_id: organizationId,
+      p_name: name,
+      p_email: newCustomerEmail.trim() || null,
+      p_phone: newCustomerPhone.trim() || null,
+      p_address: newCustomerAddress.trim() || null,
+    })
+
+    if (insertError || !customerId) {
+      setNewCustomerError(insertError?.message ?? 'Gagal menyimpan customer.')
+      setSavingNewCustomer(false)
+      return
+    }
+
+    const customer = { id: customerId, name }
+    setCustomers((current) => [...current, customer].sort((a, b) => a.name.localeCompare(b.name)))
+    setValue('customer_id', customer.id, { shouldValidate: true })
+    setShowAddCustomer(false)
+    resetNewCustomerForm()
+    setSavingNewCustomer(false)
   }
 
   async function onSubmit(form: any) {
@@ -124,7 +174,16 @@ export default function NewInquiryPage() {
 
           <div className={loadingRefs ? "opacity-50 pointer-events-none" : ""}>
             <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1">Customer</label>
+              <div className="flex items-center justify-between mb-1">
+                <label className="block text-sm font-medium text-slate-700">Customer</label>
+                <button
+                  type="button"
+                  onClick={() => { resetNewCustomerForm(); setShowAddCustomer(true) }}
+                  className="inline-flex items-center gap-1 text-sm font-medium text-primary hover:text-primary/80"
+                >
+                  <UserPlus className="w-4 h-4" /> Tambah Customer
+                </button>
+              </div>
               <select {...register('customer_id')} className="w-full border border-slate-200 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary">
                 <option value="">-- Pilih Customer --</option>
                 {customers.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
@@ -172,6 +231,43 @@ export default function NewInquiryPage() {
           </div>
         </form>
       </div>
+        {/* Modal Tambah Customer */}
+        {showAddCustomer && (
+          <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
+            <div className="bg-white rounded-xl border border-slate-200 w-full max-w-md">
+              <div className="p-4 border-b border-slate-100 flex items-center justify-between">
+                <h2 className="text-base font-semibold text-slate-800">Tambah Customer Baru</h2>
+                <button type="button" onClick={() => { setShowAddCustomer(false); resetNewCustomerForm() }} className="text-slate-400 hover:text-slate-600"><X className="w-5 h-5" /></button>
+              </div>
+              <div className="p-4 space-y-3">
+                {newCustomerError && <div className="p-2 bg-red-50 border border-red-200 rounded text-xs text-red-700">{newCustomerError}</div>}
+                <div>
+                  <label className="block text-xs font-medium text-slate-700 mb-1">Nama Customer <span className="text-red-500">*</span></label>
+                  <input type="text" value={newCustomerName} onChange={(e) => setNewCustomerName(e.target.value)} placeholder="Nama customer" className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary" />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-slate-700 mb-1">Email</label>
+                  <input type="email" value={newCustomerEmail} onChange={(e) => setNewCustomerEmail(e.target.value)} placeholder="email@perusahaan.co.id" className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary" />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-slate-700 mb-1">No. HP</label>
+                  <input type="text" value={newCustomerPhone} onChange={(e) => setNewCustomerPhone(e.target.value)} placeholder="08xxxxxxxxxx" className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary" />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-slate-700 mb-1">Alamat</label>
+                  <input type="text" value={newCustomerAddress} onChange={(e) => setNewCustomerAddress(e.target.value)} placeholder="Alamat customer (opsional)" className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary" />
+                </div>
+              </div>
+              <div className="p-4 border-t border-slate-100 flex justify-end gap-2">
+                <button type="button" onClick={() => { setShowAddCustomer(false); resetNewCustomerForm() }} disabled={savingNewCustomer} className="px-3 py-2 text-sm text-slate-600 hover:bg-slate-100 rounded-lg disabled:opacity-60">Batal</button>
+                <button type="button" onClick={handleAddCustomer} disabled={savingNewCustomer} className="flex items-center gap-1 px-4 py-2 text-sm font-medium text-white bg-primary rounded-lg disabled:opacity-60">
+                  {savingNewCustomer ? <Loader2 className="w-4 h-4 animate-spin" /> : <Plus className="w-4 h-4" />}
+                  <span>{savingNewCustomer ? "Menyimpan..." : "Simpan"}</span>
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
     </AppShell>
   )
 }
