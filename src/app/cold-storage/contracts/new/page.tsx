@@ -4,7 +4,7 @@ import AppShell from '@/components/app-shell'
 import { useSession } from '@/hooks/use-session'
 import { useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabase/client'
-import { formatDate } from '@/lib/utils'
+import { formatDate, parsePositive } from '@/lib/utils'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { Loader2, X, Plus } from 'lucide-react'
@@ -81,6 +81,10 @@ export default function NewContractPage() {
   async function onSubmit(form: any) {
     setSaving(true)
     setError(null)
+    const rate = parsePositive(form.price_per_kg_per_day)
+    if (rate === null) { setError('Tarif per kg/hari wajib angka > 0.'); setSaving(false); return }
+    const durationDays = parseInt(form.duration_days) || 0
+    if (durationDays <= 0) { setError('Durasi hari wajib > 0.'); setSaving(false); return }
     const { data: userData } = await supabase.auth.getUser()
 
     // Generate contract number
@@ -94,7 +98,7 @@ export default function NewContractPage() {
       contract_number: contractNumber,
       start_date: form.start_date,
       end_date: computeEndDate(form.start_date, parseInt(form.duration_days) || 0) || null,
-      price_per_kg_per_day: parseFloat(form.price_per_kg_per_day) || 0,
+      price_per_kg_per_day: rate,
       minimum_1_ton: !!form.minimum_1_ton,
       notes: form.notes || null,
       status: (roleCode === 'DIRECTOR' || roleCode === 'SYSTEM_ADMIN') ? 'ACTIVE' : 'PENDING_APPROVAL',

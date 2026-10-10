@@ -8,6 +8,7 @@ import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { Loader2, X, Plus, Trash2 } from 'lucide-react'
 import { QuickAddSelect } from '@/components/quick-add-select'
+import { parseNum } from '@/lib/utils'
 
 type Customer = { id: string; name: string }
 type Product = { id: string; name: string; sku: string }
@@ -76,13 +77,21 @@ export default function NewSOPage() {
     const lines = validItems.map((item) => ({
       so_id: so.id,
       product_id: item.product_id,
-      quantity_kg: parseFloat(item.quantity_kg),
-      price_per_kg: parseFloat(item.price_per_kg),
-      subtotal: parseFloat(item.quantity_kg) * parseFloat(item.price_per_kg),
+      quantity_kg: parseNum(item.quantity_kg),
+      price_per_kg: parseNum(item.price_per_kg),
+      subtotal: parseNum(item.quantity_kg) * parseNum(item.price_per_kg),
     }))
+    if (lines.some((l) => !(l.quantity_kg > 0) || l.price_per_kg < 0)) {
+      await supabase.from('sales_orders').delete().eq('id', so.id)
+      setError('Kuantitas harus > 0 dan harga tidak boleh negatif.')
+      setSaving(false); return
+    }
 
     const { error: lineErr } = await supabase.from('sales_order_lines').insert(lines)
-    if (lineErr) { setError(lineErr.message); setSaving(false); return }
+    if (lineErr) {
+      await supabase.from('sales_orders').delete().eq('id', so.id)
+      setError(lineErr.message); setSaving(false); return
+    }
 
     // Create approval request for non-director users
     if (roleCode !== 'DIRECTOR' && roleCode !== 'SYSTEM_ADMIN') {

@@ -7,7 +7,7 @@ import { DocumentPrintView, type DocumentPrintData } from '@/components/document
 import { useSession } from '@/hooks/use-session'
 import { useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabase/client'
-import { formatCurrency, formatDate } from '@/lib/utils'
+import { formatCurrency, formatDate, parsePositive } from '@/lib/utils'
 import { Search, CreditCard, Loader2, X, Plus, Trash2, Pencil, Calendar, Printer } from 'lucide-react'
 
 type Payment = {
@@ -82,8 +82,9 @@ export default function PaymentsPage() {
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
-    if (!form.amount) {
-      alert('Jumlah wajib diisi')
+    const amount = parsePositive(form.amount)
+    if (amount === null) {
+      setError('Jumlah harus angka > 0')
       return
     }
     setSaving(true)
@@ -92,7 +93,7 @@ export default function PaymentsPage() {
     const payload = {
       organization_id: organizationId,
       payment_date: form.payment_date,
-      amount: parseFloat(form.amount),
+      amount,
       payment_method: form.payment_method,
       bank_account: form.bank_account || null,
       notes: form.notes || null,

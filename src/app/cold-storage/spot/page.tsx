@@ -130,7 +130,7 @@ export default function SpotPage() {
     if (topupErr) { setError(topupErr.message); setSaving(false); return }
 
     // Catat pemasukan keuangan (upfront)
-    await supabase.from('transactions').insert({
+    const { error: txErr } = await supabase.from('transactions').insert({
       organization_id: organizationId,
       transaction_date: startDate,
       description: `Titipan harian ${contractNumber} — ${kg}kg x ${RATE} x ${days} hari`,
@@ -140,6 +140,11 @@ export default function SpotPage() {
       reference_id: inserted.id,
       created_by: userId,
     })
+    if (txErr) {
+      await supabase.from('rental_contracts').delete().eq('id', inserted.id)
+      setError(`Kontrak dibatalkan: gagal mencatat transaksi (${txErr.message})`)
+      setSaving(false); fetchData(); return
+    }
 
     setSaving(false)
     setShowNew(false)

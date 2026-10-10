@@ -83,6 +83,19 @@ export default function SettingsPage() {
   }
 
   async function handleSave() {
+    // Validasi nilai numerik: tarif/interval tidak boleh 0, negatif, atau NaN.
+    for (const group of FIELDS) {
+      for (const f of group.items) {
+        if (f.type !== 'number') continue
+        const raw = (values[f.key] ?? '').trim()
+        const n = parseFloat(raw)
+        const min = f.key === 'rental.tariff_per_kg_per_day' ? 0.01 : 1
+        if (!Number.isFinite(n) || n < min) {
+          setError(`${f.label} harus angka >= ${min}.`)
+          return
+        }
+      }
+    }
     setSaving(true)
     setError(null)
     setSaved(false)

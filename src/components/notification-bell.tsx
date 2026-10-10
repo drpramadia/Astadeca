@@ -54,6 +54,7 @@ export default function NotificationBell() {
   const [approvals, setApprovals] = useState<Approval[]>([])
   const [loading, setLoading] = useState(false)
   const [processing, setProcessing] = useState<string | null>(null)
+  const [error, setError] = useState<string | null>(null)
   const ref = useRef<HTMLDivElement>(null)
 
   const canApprove = roleCode === 'DIRECTOR' || roleCode === 'SYSTEM_ADMIN'
@@ -143,9 +144,10 @@ export default function NotificationBell() {
     )
     if (!ok) return
     setProcessing(id)
+    setError(null)
     const { data: userData } = await supabase.auth.getUser()
     const row = approvals.find((a) => a.id === id)
-    const { error } = await supabase
+    const { error: updErr } = await supabase
       .from('approval_requests')
       .update({
         status: decision,
@@ -154,19 +156,30 @@ export default function NotificationBell() {
       })
       .eq('id', id)
 
-    if (!error && row) {
+    if (!updErr && row) {
       const refId = row.reference_id
+      const nextStatus = decision === 'APPROVED' ? 'APPROVED' : 'REJECTED'
+      let docErr: { message: string } | null = null
       if (row.request_type === 'PURCHASE_ORDER') {
-        await supabase.from('purchase_orders').update({ status: decision === 'APPROVED' ? 'APPROVED' : 'REJECTED' }).eq('id', refId)
+        ({ error: docErr } = await supabase.from('purchase_orders').update({ status: nextStatus }).eq('id', refId))
       } else if (row.request_type === 'SALES_ORDER') {
-        await supabase.from('sales_orders').update({ status: decision === 'APPROVED' ? 'APPROVED' : 'REJECTED' }).eq('id', refId)
+        ({ error: docErr } = await supabase.from('sales_orders').update({ status: nextStatus }).eq('id', refId))
       } else if (row.request_type === 'CONTRACT') {
-        await supabase.from('rental_contracts').update({ status: decision === 'APPROVED' ? 'ACTIVE' : 'CANCELLED' }).eq('id', refId)
+        ({ error: docErr } = await supabase.from('rental_contracts').update({ status: decision === 'APPROVED' ? 'ACTIVE' : 'CANCELLED' }).eq('id', refId))
       } else if (row.request_type === 'QUOTATION') {
-        await supabase.from('quotations').update({ status: decision === 'APPROVED' ? 'APPROVED' : 'REJECTED' }).eq('id', refId)
+        ({ error: docErr } = await supabase.from('quotations').update({ status: nextStatus }).eq('id', refId))
       } else if (row.request_type === 'DELIVERY') {
-        await supabase.from('delivery_requests').update({ status: decision }).eq('id', refId)
+        ({ error: docErr } = await supabase.from('delivery_requests').update({ status: decision }).eq('id', refId))
       }
+      if (docErr) {
+        // Balikkan status approval agar tidak ada dokumen yang tidak sinkron
+        await supabase.from('approval_requests')
+          .update({ status: 'PENDING', decided_by: null, decided_at: null })
+          .eq('id', id)
+        setError(`Gagal memperbarui dokumen: ${docErr.message}`)
+      }
+    } else if (updErr) {
+      setError(updErr.message)
     }
     setProcessing(null)
     load()
@@ -288,6 +301,12 @@ export default function NotificationBell() {
               </div>
             )}
           </div>
+
+          {error && (
+            <div className="px-4 py-2 border-t border-red-200 bg-red-50 text-xs text-red-700">
+              {error}
+            </div>
+          )}
 
           <div className="flex items-center justify-between px-4 py-2 border-t border-slate-200 bg-slate-50">
             <button

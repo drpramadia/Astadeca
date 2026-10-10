@@ -7,6 +7,7 @@ import { supabase } from '@/lib/supabase/client'
 import { useRouter } from 'next/navigation'
 import { Loader2, Trash2, Plus } from 'lucide-react'
 import { QuickAddSelect } from '@/components/quick-add-select'
+import { parseNum } from '@/lib/utils'
 
 type Customer = { id: string; name: string }
 type Product = { id: string; name: string; sku: string }
@@ -80,11 +81,14 @@ export default function NewRfqCustomerPage() {
         rfq_id: inserted.id,
         product_id: l.product_id,
         description: l.description || null,
-        quantity_kg: parseFloat(l.quantity_kg),
+        quantity_kg: parseNum(l.quantity_kg),
       }))
     )
     setSaving(false)
-    if (lineErr) { setError(lineErr.message); return }
+    if (lineErr) {
+      await supabase.from('customer_rfq').delete().eq('id', inserted.id)
+      setError(lineErr.message); return
+    }
     router.push(`/operational/rfq-customer/${inserted.id}`)
   }
 

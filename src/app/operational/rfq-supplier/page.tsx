@@ -8,7 +8,7 @@ import { useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabase/client'
 import Link from 'next/link'
 import { Search, PackageSearch, Loader2, ArrowRight, Plus, Trash2 } from 'lucide-react'
-import { formatDate } from '@/lib/utils'
+import { formatDate, parseNum } from '@/lib/utils'
 
 type SupplierRfq = {
   id: string
@@ -101,10 +101,13 @@ export default function RfqSupplierPage() {
     if (insErr || !inserted) { setError(insErr?.message ?? 'Gagal.'); setSaving(false); return }
 
     const { error: lineErr } = await supabase.from('supplier_rfq_lines').insert(
-      valid.map((l) => ({ rfq_id: inserted.id, product_id: l.product_id, description: l.description || null, quantity_kg: parseFloat(l.quantity_kg) }))
+      valid.map((l) => ({ rfq_id: inserted.id, product_id: l.product_id, description: l.description || null, quantity_kg: parseNum(l.quantity_kg) }))
     )
     setSaving(false)
-    if (lineErr) { setError(lineErr.message); return }
+    if (lineErr) {
+      await supabase.from('supplier_rfq').delete().eq('id', inserted.id)
+      setError(lineErr.message); return
+    }
     setShowNew(false)
     setSupplierId(''); setCustomerRfqId(''); setResponseDue('')
     setLines([{ product_id: '', description: '', quantity_kg: '' }])

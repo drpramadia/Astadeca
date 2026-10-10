@@ -7,7 +7,7 @@ import { DocumentPrintView, type DocumentPrintData } from '@/components/document
 import { useSession } from '@/hooks/use-session'
 import { useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabase/client'
-import { formatCurrency, formatDate } from '@/lib/utils'
+import { formatCurrency, formatDate, parsePositive } from '@/lib/utils'
 import { Search, DollarSign, Loader2, X, Plus, Trash2, Pencil, Printer } from 'lucide-react'
 
 type Transaction = {
@@ -66,8 +66,13 @@ export default function FinanceTransactionsPage() {
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
-    if (!form.description.trim() || !form.amount) {
-      alert('Deskripsi dan jumlah wajib diisi')
+    if (!form.description.trim()) {
+      setError('Deskripsi wajib diisi')
+      return
+    }
+    const amount = parsePositive(form.amount)
+    if (amount === null) {
+      setError('Jumlah harus angka > 0')
       return
     }
     setSaving(true)
@@ -77,7 +82,7 @@ export default function FinanceTransactionsPage() {
       organization_id: organizationId,
       transaction_date: form.transaction_date || new Date().toISOString().split('T')[0],
       description: form.description.trim(),
-      amount: parseFloat(form.amount),
+      amount,
       type: form.type,
       reference_type: form.reference_type || null,
       reference_id: form.reference_id || null,

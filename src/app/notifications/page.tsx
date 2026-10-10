@@ -50,22 +50,25 @@ export default function NotificationsPage() {
   }
 
   async function markAsRead(id: string) {
-    await supabase.from('notifications').update({ is_read: true }).eq('id', id)
+    const { error: err } = await supabase.from('notifications').update({ is_read: true }).eq('id', id)
+    if (err) { setError(err.message); return }
     setData((prev) => prev.map((n) => (n.id === id ? { ...n, is_read: true } : n)))
   }
 
   async function markAllAsRead() {
-    await supabase
+    const { error: err } = await supabase
       .from('notifications')
       .update({ is_read: true })
       .eq('organization_id', organizationId)
       .eq('is_read', false)
+    if (err) { setError(err.message); return }
     setData((prev) => prev.map((n) => ({ ...n, is_read: true })))
   }
 
   async function handleDelete(id: string) {
     if (!confirm('Hapus notifikasi ini?')) return
-    await supabase.from('notifications').delete().eq('id', id)
+    const { error: err } = await supabase.from('notifications').delete().eq('id', id)
+    if (err) { setError(err.message); return }
     setData((prev) => prev.filter((n) => n.id !== id))
   }
 

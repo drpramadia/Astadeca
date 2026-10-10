@@ -97,12 +97,18 @@ export default function GoodsIssuesPage() {
     setSaving(true)
     setError(null)
 
-    // Kurangi stok
-    const { error: updErr } = await supabase
+    // Kurangi stok (atomic: gagal bila stok berubah / tidak cukup)
+    const { data: updRows, error: updErr } = await supabase
       .from('inventory')
       .update({ quantity_kg: Number(row.quantity_kg) - q })
       .eq('id', row.id)
+      .gte('quantity_kg', q)
+      .select('id')
     if (updErr) { setError(updErr.message); setSaving(false); return }
+    if (!updRows || updRows.length === 0) {
+      setError('Stok berubah / tidak cukup. Muat ulang lalu coba lagi.')
+      setSaving(false); fetchData(); return
+    }
 
     // Catat movement OUT
     const { error: mvErr } = await supabase.from('inventory_movements').insert({
@@ -116,7 +122,14 @@ export default function GoodsIssuesPage() {
       notes: reason || 'Pengeluaran barang manual (warehouse)',
       performed_by: userId,
     })
-    if (mvErr) { setError(mvErr.message); setSaving(false); return }
+    if (mvErr) {
+      // Rollback stok supaya tidak hilang tanpa catatan
+      await supabase.from('inventory')
+        .update({ quantity_kg: Number(row.quantity_kg) })
+        .eq('id', row.id)
+      setError(`${mvErr.message} — stok dikembalikan.`)
+      setSaving(false); fetchData(); return
+    }
 
     setSaving(false)
     setShowForm(false)

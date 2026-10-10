@@ -1,8 +1,12 @@
 import { NextResponse, type NextRequest } from 'next/server'
 import { createServerClient } from '@supabase/ssr'
 
-/** Rute publik yang tidak memerlukan login. */
-const PUBLIC_PATHS = ['/login', '/auth', '/_next', '/favicon', '/logo', '/api']
+/**
+ * Rute publik yang tidak memerlukan login.
+ * Catatan: `/api` sengaja TIDAK ada di sini — route handler baru otomatis
+ * terlindungi. Route API yang memang publik harus di-whitelist eksplisit.
+ */
+const PUBLIC_PATHS = ['/login', '/auth', '/_next', '/favicon', '/logo']
 
 function isPublic(pathname: string): boolean {
   if (pathname === '/') return false

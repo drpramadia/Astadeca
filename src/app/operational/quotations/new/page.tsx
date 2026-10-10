@@ -8,7 +8,7 @@ import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { Loader2, X, Plus, Trash2, Calendar, Percent, Boxes } from 'lucide-react'
 import { useForm, useFieldArray } from 'react-hook-form'
-import { formatNumber } from '@/lib/utils'
+import { formatNumber, parseNum } from '@/lib/utils'
 import { QuickAddSelect } from '@/components/quick-add-select'
 
 type Customer = { id: string; name: string }
@@ -134,13 +134,16 @@ function NewQuotationForm() {
 
     const lines = validItems.map((item) => ({
       product_id: item.product_id,
-      quantity_kg: parseFloat(item.quantity_kg),
-      price_per_kg: parseFloat(item.price_per_kg),
-      subtotal: parseFloat(item.quantity_kg) * parseFloat(item.price_per_kg),
+      quantity_kg: parseNum(item.quantity_kg),
+      price_per_kg: parseNum(item.price_per_kg),
+      subtotal: parseNum(item.quantity_kg) * parseNum(item.price_per_kg),
       description: item.description,
-      cost_per_kg: parseFloat(item.cost_per_kg || '0') || 0,
-      markup_percent: parseFloat(item.markup_percent || '0') || 0,
+      cost_per_kg: parseNum(item.cost_per_kg),
+      markup_percent: parseNum(item.markup_percent),
     }))
+    if (lines.some((l) => !(l.quantity_kg > 0) || l.price_per_kg < 0)) {
+      setError('Kuantitas harus > 0 dan harga tidak boleh negatif.'); setSaving(false); return
+    }
     const totalAmount = lines.reduce((sum, l) => sum + l.subtotal, 0)
 
     const { data: inserted, error: insErr } = await supabase.from('quotations').insert({
@@ -165,17 +168,27 @@ function NewQuotationForm() {
     const { error: lineErr } = await supabase.from('quotation_lines').insert(
       lines.map(l => ({ ...l, quotation_id: inserted.id }))
     )
-    if (lineErr) { setError(lineErr.message); return }
+    if (lineErr) {
+      await supabase.from('quotations').delete().eq('id', inserted.id)
+      setError(lineErr.message); return
+    }
 
     // Create approval request for non-director
     if (roleCode !== 'DIRECTOR' && roleCode !== 'SYSTEM_ADMIN') {
-      await supabase.from('approval_requests').insert({
+      const { data: appr, error: apprErr } = await supabase.from('approval_requests').insert({
         organization_id: organizationId,
         request_type: 'QUOTATION',
         reference_id: inserted.id,
         status: 'PENDING',
         requested_by: userData.user?.id,
-      })
+      }).select().single()
+      if (apprErr) {
+        await supabase.from('quotations').delete().eq('id', inserted.id)
+        setError(apprErr.message); return
+      }
+      if (appr?.id) {
+        await supabase.from('quotations').update({ approval_request_id: appr.id }).eq('id', inserted.id)
+      }
     }
 
     router.push('/operational/quotations')

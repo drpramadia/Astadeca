@@ -47,6 +47,25 @@ export function formatCurrency(
 }
 
 /**
+ * Parse angka dari input form. Mengembalikan fallback bila kosong/non-numerik.
+ * Dipakai supaya NaN tidak pernah masuk ke DB.
+ */
+export function parseNum(value: unknown, fallback = 0): number {
+  if (typeof value === 'number') return Number.isFinite(value) ? value : fallback
+  if (typeof value !== 'string') return fallback
+  const n = parseFloat(value.trim())
+  return Number.isFinite(n) ? n : fallback
+}
+
+/**
+ * Parse angka wajib > 0. null bila tidak valid.
+ */
+export function parsePositive(value: unknown): number | null {
+  const n = parseNum(value, NaN)
+  return Number.isFinite(n) && n > 0 ? n : null
+}
+
+/**
  * Get Tailwind CSS tone class based on status keyword
  */
 export function getBadgeTone(status: string): string {

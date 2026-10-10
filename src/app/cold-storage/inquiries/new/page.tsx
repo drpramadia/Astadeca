@@ -78,7 +78,7 @@ export default function NewInquiryPage() {
     if (err || !inserted) { setSaving(false); setError(err?.message ?? 'Gagal menyimpan inquiry'); return }
 
     // Buat approval request agar muncul di halaman Approval (Director)
-    await supabase.from('approval_requests').insert({
+    const { error: apprErr } = await supabase.from('approval_requests').insert({
       organization_id: organizationId,
       request_type: 'RENTAL_INQUIRY',
       reference_id: inserted.id,
@@ -86,6 +86,10 @@ export default function NewInquiryPage() {
       requested_by: uid,
       comment: 'Permintaan sewa cold storage, menunggu persetujuan.',
     })
+    if (apprErr) {
+      await supabase.from('rental_inquiries').delete().eq('id', inserted.id)
+      setSaving(false); setError(apprErr.message); return
+    }
 
     setSaving(false)
     router.push('/cold-storage/inquiries')

@@ -7,6 +7,7 @@ import { useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabase/client'
 import Link from 'next/link'
 import { Plus, DollarSign, Loader2, Pencil, Trash2 } from 'lucide-react'
+import { parseNum, parsePositive } from '@/lib/utils'
 
 type Rate = {
   id: string
@@ -58,14 +59,18 @@ export default function RatesPage() {
 
   async function handleSave(e: React.FormEvent) {
     e.preventDefault()
+    const price = parsePositive(formData.price_per_kg_per_day)
+    if (price === null) { setError('Tarif per kg/hari wajib angka > 0.'); return }
+    const minDays = parseInt(formData.minimum_days) || 1
+    if (minDays < 1) { setError('Minimum hari minimal 1.'); return }
     setSaving(true)
     setError(null)
     const payload = {
       organization_id: organizationId,
       cold_storage_id: formData.cold_storage_id || null,
-      price_per_kg_per_day: parseFloat(formData.price_per_kg_per_day) || 0,
-      minimum_days: parseInt(formData.minimum_days) || 1,
-      minimum_kg: parseFloat(formData.minimum_kg) || 0,
+      price_per_kg_per_day: price,
+      minimum_days: minDays,
+      minimum_kg: parseNum(formData.minimum_kg),
       status: 'ACTIVE',
     }
     if (editId) {
@@ -95,7 +100,8 @@ export default function RatesPage() {
 
   async function handleDelete(id: string) {
     if (!confirm('Hapus rate ini?')) return
-    await supabase.from('rental_rates').delete().eq('id', id)
+    const { error: err } = await supabase.from('rental_rates').delete().eq('id', id)
+    if (err) { setError(err.message); return }
     fetchData()
   }
 

@@ -188,11 +188,12 @@ export default function DeliveryOrdersPage() {
 
   async function handlePrepare(reqId: string) {
     setPreparing(reqId)
-    await supabase
+    const { error: err } = await supabase
       .from('delivery_requests')
       .update({ status: 'PREPARED', prepared_at: new Date().toISOString(), prepared_by: userId })
       .eq('id', reqId)
     setPreparing(null)
+    if (err) { setError(err.message); return }
     fetchAll()
   }
 
