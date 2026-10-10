@@ -7,19 +7,21 @@ import { useRoleGuard } from '@/hooks/use-role-guard'
 import { useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabase/client'
 import { exportToCsv, parseCsv } from '@/lib/csv'
-import { Plus, Search, Tag, Loader2, X, Upload, Download, Trash2, Pencil } from 'lucide-react'
+import { Plus, Search, Tag, Loader2, X, Upload, Download, Trash2, Pencil, Ruler } from 'lucide-react'
 
 type Product = {
   id: string
   name: string
   sku: string
+  category_id: string | null
+  unit_id: string | null
   product_categories: { name: string } | null
   units: { name: string; abbreviation: string } | null
   is_active: boolean
   created_at: string
 }
 
-type Category = { id: string; name: string }
+type Category = { id: string; name: string; code: string }
 type Unit = { id: string; name: string; abbreviation: string }
 
 const CSV_COLUMNS = [
@@ -31,7 +33,7 @@ const CSV_COLUMNS = [
 ]
 
 export default function ProductsPage() {
-  const { organizationId, loaded } = useSession()
+  const { organizationId, loaded, roleCode } = useSession()
   const { denied } = useRoleGuard(['ADMIN', 'DIRECTOR', 'WAREHOUSE'])
   const [data, setData] = useState<Product[]>([])
   const [loading, setLoading] = useState(true)
@@ -43,6 +45,12 @@ export default function ProductsPage() {
   const [units, setUnits] = useState<Unit[]>([])
   const [form, setForm] = useState({ name: '', sku: '', category_id: '', unit_id: '', is_active: true })
   const [editId, setEditId] = useState<string | null>(null)
+  const [referenceForm, setReferenceForm] = useState<'category' | 'unit' | null>(null)
+  const [referenceName, setReferenceName] = useState('')
+  const [referenceCode, setReferenceCode] = useState('')
+  const [savingReference, setSavingReference] = useState(false)
+  const [referenceError, setReferenceError] = useState<string | null>(null)
+  const canManageReferences = roleCode === 'ADMIN' || roleCode === 'DIRECTOR' || roleCode === 'SYSTEM_ADMIN'
 
   useEffect(() => {
     if (!loaded) return
@@ -50,25 +58,120 @@ export default function ProductsPage() {
     loadRefs()
   }, [loaded])
 
+  useEffect(() => {
+    if (!referenceForm) return
+    function handleEscape(event: KeyboardEvent) {
+      if (event.key === 'Escape' && !savingReference) setReferenceForm(null)
+    }
+    window.addEventListener('keydown', handleEscape)
+    return () => window.removeEventListener('keydown', handleEscape)
+  }, [referenceForm, savingReference])
+
   async function fetchData() {
     setLoading(true)
-    const { data: rows } = await supabase
-      .from('products')
-      .select('*, product_categories(name), units(name, abbreviation)')
-      .eq('organization_id', organizationId)
-      .order('created_at', { ascending: false })
-      .limit(500)
-    setData((rows as Product[]) || [])
-    setLoading(false)
+    try {
+      const { data: rows, error: fetchError } = await supabase
+        .from('products')
+        .select('*, product_categories(name), units(name, abbreviation)')
+        .eq('organization_id', organizationId)
+        .order('created_at', { ascending: false })
+        .limit(500)
+      if (fetchError) throw fetchError
+      setData((rows as Product[]) || [])
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Gagal memuat daftar produk.')
+    } finally {
+      setLoading(false)
+    }
   }
 
   async function loadRefs() {
-    const [cRes, uRes] = await Promise.all([
-      supabase.from('product_categories').select('id, name').eq('organization_id', organizationId).order('name'),
-      supabase.from('units').select('id, name, abbreviation').order('name'),
-    ])
-    setCategories(cRes.data || [])
-    setUnits(uRes.data || [])
+    try {
+      const [cRes, uRes] = await Promise.all([
+        supabase.from('product_categories').select('id, name, code').eq('organization_id', organizationId).order('name'),
+        supabase.from('units').select('id, name, abbreviation').order('name'),
+      ])
+      const refsError = cRes.error || uRes.error
+      if (refsError) throw refsError
+      setCategories(cRes.data || [])
+      setUnits(uRes.data || [])
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Gagal memuat kategori dan satuan.')
+    }
+  }
+
+  function openReferenceForm(kind: 'category' | 'unit') {
+    setReferenceForm(kind)
+    setReferenceName('')
+    setReferenceCode('')
+    setReferenceError(null)
+  }
+
+  async function handleCreateReference(e: React.FormEvent) {
+    e.preventDefault()
+    if (!referenceForm) return
+    if (!canManageReferences) {
+      setReferenceError('Anda tidak memiliki izin untuk mengelola kategori atau satuan.')
+      return
+    }
+    const name = referenceName.trim()
+    const code = referenceCode.trim()
+    if (!name || !code) {
+      setReferenceError(referenceForm === 'category' ? 'Nama dan kode kategori wajib diisi.' : 'Nama dan singkatan satuan wajib diisi.')
+      return
+    }
+    if (!organizationId && referenceForm === 'category') {
+      setReferenceError('Organisasi tidak ditemukan. Silakan login ulang.')
+      return
+    }
+
+    setSavingReference(true)
+    setReferenceError(null)
+    try {
+      if (referenceForm === 'category') {
+        const duplicate = categories.some((category) =>
+          category.name.toLowerCase() === name.toLowerCase() ||
+          category.code.toLowerCase() === code.toLowerCase()
+        )
+        if (duplicate) throw new Error('Nama atau kode kategori sudah digunakan.')
+
+        const { data: category, error: insertError } = await supabase
+          .from('product_categories')
+          .insert({ organization_id: organizationId, name, code })
+          .select('id, name, code')
+          .single()
+        if (insertError) throw insertError
+        if (!category) throw new Error('Gagal menyimpan kategori.')
+
+        setCategories((current) => [...current, category].sort((a, b) => a.name.localeCompare(b.name)))
+        setForm((current) => ({ ...current, category_id: category.id }))
+      } else {
+        const duplicate = units.some((unit) =>
+          unit.name.toLowerCase() === name.toLowerCase() ||
+          unit.abbreviation.toLowerCase() === code.toLowerCase()
+        )
+        if (duplicate) throw new Error('Nama atau singkatan satuan sudah digunakan.')
+
+        const { data: unit, error: insertError } = await supabase
+          .from('units')
+          .insert({ name, abbreviation: code })
+          .select('id, name, abbreviation')
+          .single()
+        if (insertError) throw insertError
+        if (!unit) throw new Error('Gagal menyimpan satuan.')
+
+        setUnits((current) => [...current, unit].sort((a, b) => a.name.localeCompare(b.name)))
+        setForm((current) => ({ ...current, unit_id: unit.id }))
+      }
+
+      setReferenceForm(null)
+      setReferenceName('')
+      setReferenceCode('')
+    } catch (e) {
+      setReferenceError(e instanceof Error ? e.message : 'Gagal menyimpan data.')
+    } finally {
+      setSavingReference(false)
+    }
   }
 
   const filtered = data.filter((r) => {
@@ -85,8 +188,8 @@ export default function ProductsPage() {
     setForm({
       name: row.name,
       sku: row.sku,
-      category_id: '',
-      unit_id: '',
+      category_id: row.category_id ?? '',
+      unit_id: row.unit_id ?? '',
       is_active: row.is_active,
     })
     setShowForm(true)
@@ -258,7 +361,14 @@ export default function ProductsPage() {
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1">Kategori</label>
+                <div className="flex items-center justify-between mb-1">
+                  <label className="block text-sm font-medium text-slate-700">Kategori</label>
+                  {canManageReferences && (
+                    <button type="button" onClick={() => openReferenceForm('category')} className="inline-flex items-center gap-1 text-xs font-medium text-primary hover:text-primary/80">
+                      <Plus className="w-3.5 h-3.5" /> Tambah kategori
+                    </button>
+                  )}
+                </div>
                 <select
                   value={form.category_id}
                   onChange={(e) => setForm({ ...form, category_id: e.target.value })}
@@ -269,7 +379,14 @@ export default function ProductsPage() {
                 </select>
               </div>
               <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1">Satuan</label>
+                <div className="flex items-center justify-between mb-1">
+                  <label className="block text-sm font-medium text-slate-700">Satuan</label>
+                  {canManageReferences && (
+                    <button type="button" onClick={() => openReferenceForm('unit')} className="inline-flex items-center gap-1 text-xs font-medium text-primary hover:text-primary/80">
+                      <Plus className="w-3.5 h-3.5" /> Tambah satuan
+                    </button>
+                  )}
+                </div>
                 <select
                   value={form.unit_id}
                   onChange={(e) => setForm({ ...form, unit_id: e.target.value })}
@@ -309,6 +426,68 @@ export default function ProductsPage() {
               </button>
             </div>
           </form>
+        )}
+
+        {referenceForm && (
+          <div
+            className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
+            onClick={(event) => {
+              if (event.target === event.currentTarget && !savingReference) setReferenceForm(null)
+            }}
+          >
+            <form
+              onSubmit={handleCreateReference}
+              role="dialog"
+              aria-modal="true"
+              aria-labelledby="reference-dialog-title"
+              className="w-full max-w-md rounded-xl border border-slate-200 bg-white shadow-2xl"
+            >
+              <div className="flex items-center justify-between border-b border-slate-100 p-4">
+                <h2 id="reference-dialog-title" className="text-base font-semibold text-slate-800">
+                  {referenceForm === 'category' ? 'Tambah Kategori Produk' : 'Tambah Satuan'}
+                </h2>
+                <button type="button" onClick={() => setReferenceForm(null)} disabled={savingReference} className="text-slate-400 hover:text-slate-600 disabled:opacity-50" aria-label="Tutup">
+                  <X className="h-5 w-5" />
+                </button>
+              </div>
+              <div className="space-y-3 p-4">
+                {referenceError && <div role="alert" className="rounded border border-red-200 bg-red-50 p-2 text-xs text-red-700">{referenceError}</div>}
+                <div>
+                  <label className="mb-1 block text-xs font-medium text-slate-700">
+                    {referenceForm === 'category' ? 'Nama kategori *' : 'Nama satuan *'}
+                  </label>
+                  <input
+                    autoFocus
+                    value={referenceName}
+                    onChange={(e) => setReferenceName(e.target.value)}
+                    required
+                    maxLength={100}
+                    className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+                  />
+                </div>
+                <div>
+                  <label className="mb-1 block text-xs font-medium text-slate-700">
+                    {referenceForm === 'category' ? 'Kode kategori *' : 'Singkatan satuan *'}
+                  </label>
+                  <input
+                    value={referenceCode}
+                    onChange={(e) => setReferenceCode(e.target.value)}
+                    required
+                    maxLength={30}
+                    className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+                    placeholder={referenceForm === 'category' ? 'Contoh: FROZEN' : 'Contoh: kg'}
+                  />
+                </div>
+              </div>
+              <div className="flex justify-end gap-2 border-t border-slate-100 p-4">
+                <button type="button" onClick={() => setReferenceForm(null)} disabled={savingReference} className="rounded-lg px-3 py-2 text-sm text-slate-600 hover:bg-slate-100 disabled:opacity-50">Batal</button>
+                <button type="submit" disabled={savingReference} className="inline-flex items-center gap-1 rounded-lg bg-primary px-4 py-2 text-sm font-medium text-white disabled:opacity-60">
+                  {savingReference ? <Loader2 className="h-4 w-4 animate-spin" /> : referenceForm === 'category' ? <Tag className="h-4 w-4" /> : <Ruler className="h-4 w-4" />}
+                  {savingReference ? 'Menyimpan...' : 'Simpan'}
+                </button>
+              </div>
+            </form>
+          </div>
         )}
 
         <div className="relative mb-4">
