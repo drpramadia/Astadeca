@@ -20,6 +20,7 @@ import {
   Activity,
   FileSignature,
   AlertTriangle,
+  RefreshCw,
 } from 'lucide-react'
 import { supabase } from '@/lib/supabase/client'
 import { formatCurrency, formatNumber } from '@/lib/utils'
@@ -39,7 +40,7 @@ function StatCard({
   href?: string
 }) {
   const inner = (
-    <div className="bg-white rounded-xl border border-slate-200 p-5 hover:shadow-md transition-shadow group">
+    <div className="bg-white rounded-2xl border border-slate-200/80 p-5 shadow-sm hover:-translate-y-0.5 hover:border-cyan-200 hover:shadow-lg hover:shadow-slate-200/60 transition-all group">
       <div className="flex items-start justify-between">
         <div>
           <p className="text-sm font-medium text-slate-500">{label}</p>
@@ -136,10 +137,13 @@ export default function DashboardPage() {
     needIssue: 0,
   })
   const [loading, setLoading] = useState(true)
+  const [refreshing, setRefreshing] = useState(false)
+  const [refreshError, setRefreshError] = useState<string | null>(null)
   const [activities, setActivities] = useState<{ id: string; type: string; label: string; time: string }[]>([])
 
   const [rangeDays, setRangeDays] = useState(30)
   const [chartLoading, setChartLoading] = useState(false)
+  const [chartError, setChartError] = useState<string | null>(null)
   const [monthly, setMonthly] = useState<{ labels: string[]; revenue: number[]; expense: number[]; sales: number[]; purchase: number[] }>({ labels: [], revenue: [], expense: [], sales: [], purchase: [] })
 
   useEffect(() => {
@@ -151,7 +155,10 @@ export default function DashboardPage() {
   useEffect(() => {
     if (!loaded || !userId || !organizationId) return
     loadStats()
-    loadActivities()
+    loadActivities().catch((e) => {
+      console.error('Failed to load dashboard activities:', e)
+      setRefreshError(e instanceof Error ? e.message : 'Gagal memuat aktivitas.')
+    })
   }, [loaded, userId, organizationId])
 
   useEffect(() => {
@@ -162,55 +169,73 @@ export default function DashboardPage() {
 
   async function loadCharts() {
     setChartLoading(true)
-    const since = new Date()
-    since.setDate(since.getDate() - rangeDays)
-    const sinceISO = since.toISOString().slice(0, 10)
+    setChartError(null)
+    try {
+      const today = new Date()
+      const start = new Date(today.getFullYear(), today.getMonth(), today.getDate() - rangeDays + 1)
+      const dateKey = (date: Date) => `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`
+      const sinceISO = dateKey(start)
 
-    const [txRes, soRes, poRes] = await Promise.all([
-      supabase.from('transactions').select('amount, type, transaction_date').eq('organization_id', organizationId).gte('transaction_date', sinceISO),
-      supabase.from('sales_orders').select('total_amount, order_date').eq('organization_id', organizationId).gte('order_date', sinceISO),
-      supabase.from('purchase_orders').select('total_amount, order_date').eq('organization_id', organizationId).gte('order_date', sinceISO),
-    ])
+      const [txRes, soRes, poRes] = await Promise.all([
+        supabase.from('transactions').select('amount, type, transaction_date').eq('organization_id', organizationId).gte('transaction_date', sinceISO),
+        supabase.from('sales_orders').select('total_amount, order_date').eq('organization_id', organizationId).gte('order_date', sinceISO),
+        supabase.from('purchase_orders').select('total_amount, order_date').eq('organization_id', organizationId).gte('order_date', sinceISO),
+      ])
+      const queryError = txRes.error || soRes.error || poRes.error
+      if (queryError) throw queryError
 
-    // Susun bucket per bulan (maks 6 bulan terakhir dalam rentang)
-    const buckets: { key: string; label: string }[] = []
-    for (let i = 5; i >= 0; i--) {
-      const d = new Date(); d.setDate(1); d.setMonth(d.getMonth() - i)
-      buckets.push({ key: d.toISOString().slice(0, 7), label: d.toLocaleDateString('id-ID', { month: 'short' }) })
+      const bucketCount = rangeDays === 365 ? 12 : 6
+      const buckets = Array.from({ length: bucketCount }, (_, index) => {
+        const bucketStart = new Date(start)
+        bucketStart.setDate(start.getDate() + Math.floor((index * rangeDays) / bucketCount))
+        return {
+          start: bucketStart,
+          label: bucketStart.toLocaleDateString('id-ID', { day: '2-digit', month: 'short' }),
+        }
+      })
+      const getBucket = (value: string) => {
+        const day = new Date(`${value.slice(0, 10)}T00:00:00`)
+        const offset = Math.floor((day.getTime() - start.getTime()) / 86_400_000)
+        const index = Math.floor((offset * bucketCount) / rangeDays)
+        return index >= 0 && index < bucketCount ? index : -1
+      }
+      const revenue = new Array(bucketCount).fill(0)
+      const expense = new Array(bucketCount).fill(0)
+      const sales = new Array(bucketCount).fill(0)
+      const purchase = new Array(bucketCount).fill(0)
+
+      txRes.data.forEach((transaction) => {
+        const index = getBucket(transaction.transaction_date)
+        if (index < 0) return
+        if (transaction.type === 'CREDIT') revenue[index] += Number(transaction.amount) || 0
+        else expense[index] += Number(transaction.amount) || 0
+      })
+      soRes.data.forEach((order) => {
+        const index = getBucket(order.order_date)
+        if (index >= 0) sales[index] += Number(order.total_amount) || 0
+      })
+      poRes.data.forEach((order) => {
+        const index = getBucket(order.order_date)
+        if (index >= 0) purchase[index] += Number(order.total_amount) || 0
+      })
+
+      setMonthly({ labels: buckets.map((bucket) => bucket.label), revenue, expense, sales, purchase })
+    } catch (e) {
+      setMonthly({ labels: [], revenue: [], expense: [], sales: [], purchase: [] })
+      setChartError(e instanceof Error ? e.message : 'Gagal memuat analitik.')
+    } finally {
+      setChartLoading(false)
     }
-    const idx = (dateStr: string | null) => {
-      if (!dateStr) return -1
-      const k = String(dateStr).slice(0, 7)
-      return buckets.findIndex((b) => b.key === k)
-    }
-    const revenue = new Array(6).fill(0)
-    const expense = new Array(6).fill(0)
-    const sales = new Array(6).fill(0)
-    const purchase = new Array(6).fill(0)
-
-    ;(txRes.data || []).forEach((t: { amount: number; type: string; transaction_date: string }) => {
-      const i = idx(t.transaction_date); if (i < 0) return
-      if (t.type === 'CREDIT') revenue[i] += Number(t.amount) || 0
-      else expense[i] += Number(t.amount) || 0
-    })
-    ;(soRes.data || []).forEach((s: { total_amount: number; order_date: string }) => {
-      const i = idx(s.order_date); if (i >= 0) sales[i] += Number(s.total_amount) || 0
-    })
-    ;(poRes.data || []).forEach((p: { total_amount: number; order_date: string }) => {
-      const i = idx(p.order_date); if (i >= 0) purchase[i] += Number(p.total_amount) || 0
-    })
-
-    setMonthly({ labels: buckets.map((b) => b.label), revenue, expense, sales, purchase })
-    setChartLoading(false)
   }
 
   async function loadActivities() {
-    const { data } = await supabase
+    const { data, error } = await supabase
       .from('inventory_movements')
       .select('id, movement_type, quantity_kg, performed_at, products(name)')
       .eq('organization_id', organizationId)
       .order('performed_at', { ascending: false })
       .limit(6)
+    if (error) throw error
 
     let rows = ((data as unknown as { id: string; movement_type: string; quantity_kg: number; performed_at: string; products: { name: string } | null }[]) || []).map((m) => ({
       id: m.id,
@@ -226,6 +251,8 @@ export default function DashboardPage() {
         supabase.from('rental_receivings').select('id, received_kg, received_at, batch_number').eq('organization_id', organizationId).order('received_at', { ascending: false }).limit(4),
         supabase.from('rental_releases').select('id, released_kg, released_at, batch_number').eq('organization_id', organizationId).order('released_at', { ascending: false }).limit(4),
       ])
+      const activityError = recvRes.error || relRes.error
+      if (activityError) throw activityError
       const recv = ((recvRes.data as unknown as { id: string; received_kg: number; received_at: string; batch_number: string | null }[]) || []).map((r) => ({
         id: 'recv-' + r.id,
         type: 'IN',
@@ -249,8 +276,8 @@ export default function DashboardPage() {
     setActivities(rows)
   }
 
-  async function loadStats() {
-    setLoading(true)
+  async function loadStats(showLoader = true) {
+    if (showLoader) setLoading(true)
     try {
       const inventoryRes = await supabase
         .from('inventory')
@@ -261,6 +288,8 @@ export default function DashboardPage() {
         .from('cold_storages')
         .select('id, capacity_kg', { count: 'exact' })
         .eq('organization_id', organizationId)
+      const baseError = inventoryRes.error || coldStorageRes.error
+      if (baseError) throw baseError
 
       // Inventory breakdown
       let totalItems = 0, availableItems = 0, reservedItems = 0, quarantineItems = 0
@@ -288,6 +317,8 @@ export default function DashboardPage() {
           supabase.from('delivery_orders').select('id', { count: 'exact', head: true }).eq('organization_id', organizationId),
           supabase.from('inventory').select('quantity_kg').eq('organization_id', organizationId),
         ])
+        const opsError = activeContractsRes.error || pendingPORes.error || pendingSORes.error || deliveryOrdersRes.error || totalItemsRes.error
+        if (opsError) throw opsError
         activeContracts = activeContractsRes.count || 0
         pendingPO = pendingPORes.count || 0
         pendingSO = pendingSORes.count || 0
@@ -301,6 +332,8 @@ export default function DashboardPage() {
           supabase.from('transactions').select('amount').eq('organization_id', organizationId).eq('type', 'DEBIT'),
           supabase.from('rental_billing').select('total_amount, status').eq('organization_id', organizationId).in('status', ['DRAFT', 'SENT', 'OVERDUE']),
         ])
+        const financeError = revenueRes.error || expenseRes.error || billings.error
+        if (financeError) throw financeError
         totalRevenue = (revenueRes.data || []).reduce((sum, r) => sum + Number(r.amount), 0)
         totalExpense = (expenseRes.data || []).reduce((sum, r) => sum + Number(r.amount), 0)
         const openBills = billings.data || []
@@ -317,6 +350,8 @@ export default function DashboardPage() {
           supabase.from('rental_receivings').select('received_kg').eq('organization_id', organizationId),
           supabase.from('rental_releases').select('released_kg').eq('organization_id', organizationId),
         ])
+        const stockError = recvRes.error || relRes.error
+        if (stockError) throw stockError
         const inKg = (recvRes.data || []).reduce((s, r) => s + Number((r as { received_kg: number }).received_kg || 0), 0)
         const outKg = (relRes.data || []).reduce((s, r) => s + Number((r as { released_kg: number }).released_kg || 0), 0)
         effectiveStored = Math.max(0, inKg - outKg)
@@ -327,8 +362,10 @@ export default function DashboardPage() {
       // Sinkronkan status tagihan (SENT lewat periode -> OVERDUE) & kirim
       // pengingat penagihan agar tidak terlewat (dedupe di sisi DB).
       if (canSeeFinance) {
-        await supabase.rpc('mark_overdue_rental_billing', { p_organization_id: organizationId }).then(() => {}, () => {})
-        await supabase.rpc('notify_rental_billing_due', { p_organization_id: organizationId }).then(() => {}, () => {})
+        const overdueResult = await supabase.rpc('mark_overdue_rental_billing', { p_organization_id: organizationId })
+        if (overdueResult.error) throw overdueResult.error
+        const reminderResult = await supabase.rpc('notify_rental_billing_due', { p_organization_id: organizationId })
+        if (reminderResult.error) throw reminderResult.error
       }
 
       setStats({
@@ -355,8 +392,25 @@ export default function DashboardPage() {
       })
     } catch (e) {
       console.error('Failed to load stats:', e)
+      setRefreshError(e instanceof Error ? e.message : 'Gagal memuat ringkasan.')
     }
     setLoading(false)
+  }
+
+  async function refreshDashboard() {
+    setRefreshing(true)
+    setRefreshError(null)
+    try {
+      await Promise.all([
+        loadStats(false),
+        loadActivities(),
+        canSeeFinance ? loadCharts() : Promise.resolve(),
+      ])
+    } catch (e) {
+      setRefreshError(e instanceof Error ? e.message : 'Gagal memperbarui dashboard.')
+    } finally {
+      setRefreshing(false)
+    }
   }
 
   const greeting = (() => {
@@ -366,6 +420,8 @@ export default function DashboardPage() {
     if (hour < 18) return 'Selamat Sore'
     return 'Selamat Malam'
   })()
+  const hasChartData = [monthly.revenue, monthly.expense, monthly.sales, monthly.purchase]
+    .some((series) => series.some((value) => value > 0))
 
   if (!loaded || !userId) {
     return (
@@ -399,36 +455,50 @@ export default function DashboardPage() {
 
   return (
     <AppShell>
-      <div className="p-6 lg:p-8 max-w-7xl mx-auto">
+      <div className="p-4 sm:p-6 lg:p-8 max-w-[1600px] mx-auto space-y-6">
         {/* Header */}
-        <div className="flex items-start justify-between mb-8">
-          <div>
-            <h1 className="text-2xl font-bold text-slate-800 font-display">
-              {greeting}{loaded && name ? `, ${name.split(' ')[0]}` : ''} 👋
-            </h1>
-            <p className="mt-1 text-sm text-slate-500">
-              {loaded && roleName
-                ? `Login sebagai ${roleName} · ${new Date().toLocaleDateString('id-ID', {
-                    weekday: 'long',
-                    year: 'numeric',
-                    month: 'long',
-                    day: 'numeric',
-                  })}`
-                : 'Memuat...'}
-            </p>
+        <div className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-[#142b35] via-[#164653] to-[#087e88] px-5 py-6 text-white shadow-xl shadow-cyan-950/10 sm:px-8 sm:py-7">
+          <div className="pointer-events-none absolute -right-12 -top-24 h-64 w-64 rounded-full border border-white/10" />
+          <div className="pointer-events-none absolute -right-2 -top-12 h-44 w-44 rounded-full border border-white/10" />
+          <div className="relative flex flex-wrap items-center justify-between gap-5">
+            <div>
+              <p className="mb-2 text-xs font-semibold uppercase tracking-[0.2em] text-cyan-100/70">Astadeca · Ringkasan Operasional</p>
+              <h1 className="text-2xl font-bold font-display sm:text-3xl">
+                {greeting}{loaded && name ? `, ${name.split(' ')[0]}` : ''}
+              </h1>
+              <p className="mt-2 text-sm text-cyan-50/75">
+                {new Date().toLocaleDateString('id-ID', {
+                  weekday: 'long',
+                  year: 'numeric',
+                  month: 'long',
+                  day: 'numeric',
+                })}
+                {roleName ? ` · ${roleName}` : ''}
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={() => void refreshDashboard()}
+              disabled={refreshing}
+              className="inline-flex items-center gap-2 rounded-xl border border-white/20 bg-white/10 px-4 py-2.5 text-sm font-medium text-white backdrop-blur transition hover:bg-white/20 disabled:cursor-wait disabled:opacity-60"
+            >
+              <RefreshCw className={`h-4 w-4 ${refreshing ? 'animate-spin' : ''}`} />
+              {refreshing ? 'Memperbarui...' : 'Perbarui data'}
+            </button>
           </div>
         </div>
+        {refreshError && <div role="alert" className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">Gagal memuat sebagian data dashboard: {refreshError}</div>}
 
         {/* Stats row */}
         {isWarehouse ? (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
             <StatCard label="Total Stok" value={`${formatNumber(stats.totalItems)} kg`} icon={Boxes} color="#086b76" href="/warehouse/inventory" />
             <StatCard label="Available" value={`${formatNumber(stats.availableItems)} kg`} icon={Boxes} color="#22c55e" href="/warehouse/inventory" />
             <StatCard label="Reserved" value={`${formatNumber(stats.reservedItems)} kg`} icon={Boxes} color="#f59e0b" href="/warehouse/inventory" />
             <StatCard label="Quarantine" value={`${formatNumber(stats.quarantineItems)} kg`} icon={Boxes} color="#ef4444" href="/warehouse/inventory" />
           </div>
         ) : (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
             <StatCard label="Kontrak Aktif" value={stats.activeContracts} icon={FileText} color="#086b76" href="/cold-storage/contracts" />
             <StatCard label="PO Pending Approval" value={stats.pendingPO} icon={PackageSearch} color="#f59e0b" href="/operational/purchase-orders" />
             <StatCard label="SO Pending Approval" value={stats.pendingSO} icon={Truck} color="#0ea5e9" href="/operational/sales-orders" />
@@ -438,14 +508,14 @@ export default function DashboardPage() {
 
         {/* Analitik interaktif (keuangan & penjualan) */}
         {canSeeFinance && (
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
-            <div className="lg:col-span-2 bg-white rounded-xl border border-slate-200 p-5">
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
+            <div className="lg:col-span-2 rounded-2xl border border-slate-200/80 bg-white p-5 shadow-sm sm:p-6">
               <div className="flex items-center justify-between mb-4">
                 <div className="flex items-center gap-2">
                   <BarChart3 className="w-4 h-4 text-cyan-600" />
                   <h3 className="text-sm font-semibold text-slate-800">Pemasukan, Pengeluaran, Penjualan &amp; Pembelian</h3>
                 </div>
-                <select value={rangeDays} onChange={(e) => setRangeDays(Number(e.target.value))} className="border border-slate-200 rounded-lg px-2.5 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-primary">
+                <select aria-label="Rentang waktu grafik" value={rangeDays} onChange={(e) => setRangeDays(Number(e.target.value))} className="rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-primary">
                   <option value={30}>30 hari</option>
                   <option value={90}>90 hari</option>
                   <option value={180}>180 hari</option>
@@ -454,6 +524,20 @@ export default function DashboardPage() {
               </div>
               {chartLoading ? (
                 <div className="h-56 flex items-center justify-center text-slate-400"><Snowflake className="w-5 h-5 animate-pulse" /></div>
+              ) : chartError ? (
+                <div role="alert" className="flex h-56 items-center justify-center rounded-xl border border-red-100 bg-red-50/50 px-4 text-center text-sm text-red-700">
+                  Gagal memuat grafik: {chartError}
+                </div>
+              ) : !hasChartData ? (
+                <div className="flex h-56 flex-col items-center justify-center rounded-xl border border-dashed border-slate-200 bg-slate-50/70 px-4 text-center">
+                  <div className="mb-3 flex h-11 w-11 items-center justify-center rounded-2xl bg-cyan-50 text-cyan-700">
+                    <BarChart3 className="h-5 w-5" />
+                  </div>
+                  <p className="text-sm font-semibold text-slate-700">Belum ada aktivitas finansial</p>
+                  <p className="mt-1 max-w-sm text-xs leading-relaxed text-slate-500">
+                    Data pemasukan, pengeluaran, penjualan, dan pembelian akan dirangkum di sini sesuai periode yang dipilih.
+                  </p>
+                </div>
               ) : (
                 <BarChart
                   labels={monthly.labels}
@@ -463,13 +547,13 @@ export default function DashboardPage() {
                     { name: 'Penjualan', color: '#0ea5e9', values: monthly.sales },
                     { name: 'Pembelian', color: '#f59e0b', values: monthly.purchase },
                   ]}
-                  height={220}
+                  height={190}
                   valueFormat={(n) => formatCurrency(n)}
                 />
               )}
             </div>
 
-            <div className="bg-white rounded-xl border border-slate-200 p-5">
+            <div className="rounded-2xl border border-slate-200/80 bg-white p-5 shadow-sm sm:p-6">
               <div className="flex items-center gap-2 mb-4">
                 <Activity className="w-4 h-4 text-cyan-600" />
                 <h3 className="text-sm font-semibold text-slate-800">Untung / Rugi</h3>
@@ -489,11 +573,16 @@ export default function DashboardPage() {
           </div>
         )}
 
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <div className="space-y-7">
           {/* Quick links */}
-          <div className="lg:col-span-2">
-            <h2 className="text-base font-semibold text-slate-800 mb-4">Navigasi Cepat</h2>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <section>
+              <div className="mb-4 flex flex-wrap items-end justify-between gap-2">
+                <div>
+                  <h2 className="text-lg font-bold text-slate-800 font-display">Akses cepat</h2>
+                  <p className="mt-1 text-xs text-slate-500">Pintasan pekerjaan sesuai akses akun Anda</p>
+                </div>
+              </div>
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
               {isWarehouse ? (
                 <>
                   <QuickLink label="Inventory" description="Lihat stok barang di gudang" href="/warehouse/inventory" icon={Boxes} color="#22c55e" />
@@ -518,12 +607,12 @@ export default function DashboardPage() {
                 </>
               )}
             </div>
-          </div>
+          </section>
 
-          {/* Right column */}
-          <div className="space-y-6">
+          {/* Overview cards fill a balanced grid rather than leaving a blank column. */}
+          <section className="grid grid-cols-1 items-stretch gap-4 md:grid-cols-2 xl:grid-cols-3">
             {/* Kapasitas cold storage */}
-            <div className="bg-white rounded-xl border border-slate-200 p-5">
+            <div className="h-full rounded-2xl border border-slate-200/80 bg-white p-5 shadow-sm sm:p-6">
               <div className="flex items-center gap-2 mb-4">
                 <Snowflake className="w-4 h-4 text-cyan-600" />
                 <h3 className="text-sm font-semibold text-slate-800">Kapasitas Cold Storage</h3>
@@ -556,7 +645,7 @@ export default function DashboardPage() {
 
             {/* Penagihan / Billing — monitoring agar tidak terlewat */}
             {canSeeFinance && (
-              <div className="bg-white rounded-xl border border-slate-200 p-5">
+              <div className="h-full rounded-2xl border border-slate-200/80 bg-white p-5 shadow-sm sm:p-6">
                 <div className="flex items-center justify-between mb-4">
                   <div className="flex items-center gap-2">
                     <DollarSign className="w-4 h-4 text-cyan-600" />
@@ -589,7 +678,7 @@ export default function DashboardPage() {
             )}
 
             {/* Warehouse overview */}
-            <div className="bg-white rounded-xl border border-slate-200 p-5">
+            <div className="h-full rounded-2xl border border-slate-200/80 bg-white p-5 shadow-sm sm:p-6">
               <div className="flex items-center gap-2 mb-4">
                 <TrendingUp className="w-4 h-4 text-cyan-600" />
                 <h3 className="text-sm font-semibold text-slate-800">Warehouse Overview</h3>
@@ -616,7 +705,7 @@ export default function DashboardPage() {
 
             {/* Finance overview — hanya role berhak */}
             {canSeeFinance && (
-              <div className="bg-white rounded-xl border border-slate-200 p-5">
+              <div className="h-full rounded-2xl border border-slate-200/80 bg-white p-5 shadow-sm sm:p-6">
                 <div className="flex items-center gap-2 mb-4">
                   <DollarSign className="w-4 h-4 text-cyan-600" />
                   <h3 className="text-sm font-semibold text-slate-800">Keuangan Ringkas</h3>
@@ -646,7 +735,7 @@ export default function DashboardPage() {
 
             {/* Cold Storage status — hanya role berhak (info kontrak/utilisasi) */}
             {canSeeOps && (
-              <div className="bg-white rounded-xl border border-slate-200 p-5">
+              <div className="h-full rounded-2xl border border-slate-200/80 bg-white p-5 shadow-sm sm:p-6">
                 <div className="flex items-center gap-2 mb-4">
                   <Snowflake className="w-4 h-4 text-cyan-600" />
                   <h3 className="text-sm font-semibold text-slate-800">Cold Storage</h3>
@@ -669,7 +758,7 @@ export default function DashboardPage() {
             )}
 
             {/* Recent Activity */}
-            <div className="bg-white rounded-xl border border-slate-200 p-5">
+            <div className="h-full rounded-2xl border border-slate-200/80 bg-white p-5 shadow-sm sm:p-6">
               <div className="flex items-center gap-2 mb-4">
                 <Activity className="w-4 h-4 text-slate-400" />
                 <h3 className="text-sm font-semibold text-slate-800">Aktivitas Terakhir</h3>
@@ -690,7 +779,7 @@ export default function DashboardPage() {
                 </div>
               )}
             </div>
-          </div>
+          </section>
         </div>
       </div>
     </AppShell>
