@@ -31,6 +31,7 @@ export default function FinanceReportsPage() {
   const [data, setData] = useState<Transaction[]>([])
   const [loading, setLoading] = useState(true)
   const [dateFilter, setDateFilter] = useState('')
+  const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
     if (!loaded) return
@@ -39,6 +40,7 @@ export default function FinanceReportsPage() {
 
   async function fetchData() {
     setLoading(true)
+    setError(null)
     let q = supabase
       .from('transactions')
       .select('*')
@@ -46,13 +48,18 @@ export default function FinanceReportsPage() {
       .order('transaction_date', { ascending: false })
       .limit(2000)
     if (dateFilter) {
-      const start = `${dateFilter}-01T00:00:00`
-      const endParts = dateFilter.split('-')
-      const lastDay = new Date(parseInt(endParts[0]), parseInt(endParts[1]) - 1 + 1, 0).getDate()
-      const end = `${dateFilter.slice(0, 8).replace(/-\d{2}$/, '')}-${String(lastDay).padStart(2, '0')}T23:59:59`
-      q = q.gte('transaction_date', start).lte('transaction_date', end)
+      const [year, month] = dateFilter.split('-').map(Number)
+      const start = `${dateFilter}-01`
+      const endExclusive = new Date(Date.UTC(year, month, 1)).toISOString().slice(0, 10)
+      q = q.gte('transaction_date', start).lt('transaction_date', endExclusive)
     }
-    const { data: rows } = await q
+    const { data: rows, error: queryError } = await q
+    if (queryError) {
+      setError(queryError.message)
+      setData([])
+      setLoading(false)
+      return
+    }
     setData((rows as Transaction[]) || [])
     setLoading(false)
   }
@@ -126,6 +133,12 @@ export default function FinanceReportsPage() {
             )}
           </div>
         </div>
+
+        {error && (
+          <div role="alert" className="mb-4 px-4 py-3 rounded-lg bg-red-50 border border-red-200 text-red-700 text-sm">
+            Gagal memuat laporan: {error}
+          </div>
+        )}
 
         {loading ? (
           <div className="text-center py-12 text-slate-400">
